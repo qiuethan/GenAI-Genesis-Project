@@ -92,14 +92,15 @@ export const CameraScreen = () => {
   const scan = useScanMode(cameraRef);
   const scanActive = scan.isSelecting || scan.isScanning;
   const objectDetection = useObjectDetection({
-    enabled: true,
+    enabled: scanActive,
     confidenceThreshold: 0.3,
     skipFrames: 3,
   });
 
-  // Use object detection frame processor if available (it self-gates via enabledRef),
-  // otherwise fall back to analysis frame processor
-  const frameProcessor = objectDetection.frameProcessor ?? analysisFrameProcessor;
+  // Use object detection frame processor during scan, analysis frame processor otherwise
+  const frameProcessor = scanActive
+    ? (objectDetection.frameProcessor ?? analysisFrameProcessor)
+    : analysisFrameProcessor;
 
   // Composition assessment via Mac server over USB
   const composition = useCompositionScore({

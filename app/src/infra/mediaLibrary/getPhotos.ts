@@ -53,13 +53,20 @@ export const getPhotos = async (
       sortBy: [[MediaLibrary.SortBy.creationTime, false]],
     });
 
-    const assets: PhotoAsset[] = result.assets.map(asset => ({
-      id: asset.id,
-      uri: asset.uri,
-      width: asset.width,
-      height: asset.height,
-      creationTime: asset.creationTime,
-    }));
+    // asset.uri is ph:// which <Image> can't load.
+    // getAssetInfoAsync returns localUri (file://) which works.
+    const assets: PhotoAsset[] = await Promise.all(
+      result.assets.map(async (asset) => {
+        const info = await MediaLibrary.getAssetInfoAsync(asset);
+        return {
+          id: asset.id,
+          uri: info?.localUri ?? asset.uri,
+          width: asset.width,
+          height: asset.height,
+          creationTime: asset.creationTime,
+        };
+      })
+    );
 
     return {
       assets,
