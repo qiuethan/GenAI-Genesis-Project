@@ -1,21 +1,30 @@
 import React from 'react';
-import { View, FlatList, Image, TouchableOpacity, ActivityIndicator, Text } from 'react-native';
+import { View, FlatList, Image, TouchableOpacity, ActivityIndicator, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { IconButton } from '../components/IconButton';
-import { useGallery } from '../hooks';
+import { useGallery, useGalleryScores } from '../hooks';
 import { PhotoAsset } from '../../../infra/mediaLibrary';
 import { galleryStyles as styles, GALLERY_CONSTANTS } from '../styles/GalleryScreen.styles';
 
 const { COLUMNS } = GALLERY_CONSTANTS;
 
+const scoreToColor = (score: number): string => {
+  const t = Math.max(0, Math.min(1, score / 100));
+  if (t < 0.25) return '#ff4444';
+  if (t < 0.5) return '#ff9900';
+  if (t < 0.75) return '#aacc00';
+  return '#44cc44';
+};
+
 export const GalleryScreen = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { photos, loading } = useGallery(100);
+  const { scores } = useGalleryScores();
 
   const handlePhotoPress = (photo: PhotoAsset, index: number) => {
-    (navigation as any).navigate('ImageViewer', { 
+    (navigation as any).navigate('ImageViewer', {
       imageUri: photo.uri,
       allPhotos: photos.map(p => p.uri),
       initialIndex: index,
@@ -26,18 +35,26 @@ export const GalleryScreen = () => {
     navigation.goBack();
   };
 
-  const renderPhoto = ({ item, index }: { item: PhotoAsset; index: number }) => (
-    <TouchableOpacity
-      style={styles.photoItem}
-      onPress={() => handlePhotoPress(item, index)}
-    >
-      <Image
-        source={{ uri: item.uri }}
-        style={styles.photoImage}
-        resizeMode="cover"
-      />
-    </TouchableOpacity>
-  );
+  const renderPhoto = ({ item, index }: { item: PhotoAsset; index: number }) => {
+    const score = scores[item.id];
+    return (
+      <TouchableOpacity
+        style={styles.photoItem}
+        onPress={() => handlePhotoPress(item, index)}
+      >
+        <Image
+          source={{ uri: item.uri }}
+          style={styles.photoImage}
+          resizeMode="cover"
+        />
+        {score && (
+          <View style={[badgeStyles.badge, { backgroundColor: scoreToColor(score.score) }]}>
+            <Text style={badgeStyles.text}>{score.score}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   if (loading) {
     return (
@@ -53,9 +70,9 @@ export const GalleryScreen = () => {
       <View style={[styles.header, { paddingTop: insets.top + 10, paddingBottom: 10 }]}>
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={handleClose}>
-            <IconButton 
-              iconName="chevron-back" 
-              size={20} 
+            <IconButton
+              iconName="chevron-back"
+              size={20}
               onPress={handleClose}
               color="white"
             />
@@ -72,10 +89,10 @@ export const GalleryScreen = () => {
         keyExtractor={(item) => item.id}
         numColumns={COLUMNS}
         contentContainerStyle={[
-          styles.gridContainer, 
-          { 
+          styles.gridContainer,
+          {
             paddingTop: insets.top + 60,
-            paddingBottom: insets.bottom + 80 
+            paddingBottom: insets.bottom + 80
           }
         ]}
         columnWrapperStyle={styles.row}
@@ -88,3 +105,24 @@ export const GalleryScreen = () => {
     </View>
   );
 };
+
+const badgeStyles = StyleSheet.create({
+  badge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    borderRadius: 8,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    minWidth: 24,
+    alignItems: 'center',
+  },
+  text: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '700',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+});

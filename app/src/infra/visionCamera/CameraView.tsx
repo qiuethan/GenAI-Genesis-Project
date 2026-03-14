@@ -4,6 +4,7 @@ import { Camera, CameraDevice, useCameraDevice, useCameraPermission, ReadonlyFra
 
 export interface CameraHandle {
   takePhoto: (flash: 'off' | 'on' | 'auto') => Promise<string>; // Returns path
+  takeSnapshot: () => Promise<string>; // Returns path — captures what's on screen
   focus: (point: { x: number; y: number }) => Promise<void>;
 }
 
@@ -28,6 +29,11 @@ export const CameraView = forwardRef<CameraHandle, Props>(({ device, isActive, z
       });
       return photo.path;
     },
+    takeSnapshot: async () => {
+      if (!camera.current) throw new Error("Camera ref is null");
+      const snapshot = await camera.current.takeSnapshot({ quality: 50 });
+      return snapshot.path;
+    },
     focus: async (point) => {
       if (!camera.current) throw new Error("Camera ref is null");
       await camera.current.focus(point);
@@ -48,6 +54,7 @@ export const CameraView = forwardRef<CameraHandle, Props>(({ device, isActive, z
       device={device}
       isActive={isActive}
       photo={true}
+      video={true}
       zoom={zoom}
       torch={torch}
       exposure={mappedExposure}

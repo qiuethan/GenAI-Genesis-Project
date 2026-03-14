@@ -35,6 +35,7 @@ export interface CameraState {
 export interface ImageViewerParams {
   imageUri: string;
   allPhotos?: string[];
+  allPhotoIds?: string[];
   initialIndex?: number;
 }
 

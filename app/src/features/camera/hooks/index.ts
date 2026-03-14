@@ -20,3 +20,7 @@ export { useShakeCoach } from './useShakeCoach';
 export { useLevelCoach } from './useLevelCoach';
 export { useExposureCoach } from './useExposureCoach';
 export type { BlurCoachState, BlurCoachConfig, UseBlurCoachReturn } from './useBlurCoach';
+export { useCompositionScore } from './useCompositionScore';
+export type { CompositionResult, UseCompositionScoreConfig } from './useCompositionScore';
+export { useGalleryScores, scorePhoto } from './useGalleryScores';
+export type { GalleryScore } from './useGalleryScores';

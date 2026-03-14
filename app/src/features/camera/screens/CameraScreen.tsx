@@ -28,10 +28,11 @@ import { IconButton } from '../components/IconButton';
 import { RotatableView } from '../components/RotatableView';
 import { ShutterFlash, ShutterFlashHandle } from '../components/ShutterFlash';
 import { CameraControlsMenu } from '../components/CameraControlsMenu';
-import { useTimer, useNightMode, useExposure, useFocus, useShakeCoach, useLevelCoach, useExposureCoach } from '../hooks';
+import { useTimer, useNightMode, useExposure, useFocus, useShakeCoach, useLevelCoach, useExposureCoach, useCompositionScore, scorePhoto } from '../hooks';
 import { ShakeCoachOverlay } from '../components/ShakeCoachOverlay';
 import { LevelCoachOverlay } from '../components/LevelCoachOverlay';
 import { ExposureCoachOverlay } from '../components/ExposureCoachOverlay';
+import { CompositionScoreOverlay } from '../components/CompositionScoreOverlay';
 import { DevTools } from '../components/DevTools';
 
 export const CameraScreen = () => {
@@ -84,6 +85,13 @@ export const CameraScreen = () => {
   const shutterRef = useRef<ShutterFlashHandle>(null);
   const insets = useSafeAreaInsets();
   const orientation = useDeviceOrientation();
+
+  // Composition assessment via Mac server over USB
+  const composition = useCompositionScore({
+    cameraRef,
+    aspectRatio,
+    enabled: true,
+  });
 
   // Mapping device orientation to UI rotation
   const uiRotation = orientation === 0 ? 0 : orientation === 180 ? 180 : orientation === 90 ? 90 : 270;
@@ -205,12 +213,11 @@ export const CameraScreen = () => {
         finalPath = cropResult.uri;
       }
 
-      await saveToLibrary(finalPath);
-      
-      const latestPhoto = await getLatestPhoto();
-      if (latestPhoto) {
-        setLastPhoto(latestPhoto);
-      }
+      const asset = await saveToLibrary(finalPath);
+      setLastPhoto(asset.uri);
+
+      // Score the newly captured photo in the background
+      scorePhoto(asset.id, asset.uri).catch(() => {});
     } catch (e) {
       console.error("Processing failed", e);
     }
@@ -358,13 +365,21 @@ export const CameraScreen = () => {
               cameraFrameHeight={camHeight}
             />
           ) : shakeCoach.state.hintText ? (
-            <ShakeCoachOverlay 
-              state={shakeCoach.state} 
+            <ShakeCoachOverlay
+              state={shakeCoach.state}
               rotation={uiRotation}
               cameraFrameTop={topMargin}
               cameraFrameHeight={camHeight}
             />
           ) : null}
+
+          {/* Composition Score Overlay */}
+          <CompositionScoreOverlay
+            result={composition.result}
+            connected={composition.connected}
+            rotation={uiRotation}
+            cameraFrameTop={topMargin}
+          />
         </Pressable>
       </PinchGestureHandler>
 
