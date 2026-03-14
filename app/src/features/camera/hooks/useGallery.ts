@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getPhotos, PhotoAsset } from '../../../infra/mediaLibrary';
 
 interface UseGalleryState {
@@ -24,8 +24,10 @@ export const useGallery = (initialCount: number = 100): UseGalleryReturn => {
     hasPermission: false,
     error: null,
   });
-  const [endCursor, setEndCursor] = useState<string | undefined>();
-  const [hasNextPage, setHasNextPage] = useState(false);
+  // Use refs for pagination cursors — they don't affect rendering
+  // and keeping them out of useCallback deps prevents re-render loops.
+  const endCursorRef = useRef<string | undefined>();
+  const hasNextPageRef = useRef(false);
 
   const loadPhotos = useCallback(async (isRefresh: boolean = false) => {
     setState(prev => ({ ...prev, loading: true, error: null }));
@@ -33,7 +35,7 @@ export const useGallery = (initialCount: number = 100): UseGalleryReturn => {
     try {
       const result = await getPhotos({
         first: initialCount,
-        after: isRefresh ? undefined : endCursor,
+        after: isRefresh ? undefined : endCursorRef.current,
       });
 
       if (result === null) {
@@ -53,8 +55,8 @@ export const useGallery = (initialCount: number = 100): UseGalleryReturn => {
         hasPermission: true,
       }));
 
-      setEndCursor(result.endCursor);
-      setHasNextPage(result.hasNextPage);
+      endCursorRef.current = result.endCursor;
+      hasNextPageRef.current = result.hasNextPage;
     } catch (error) {
       setState(prev => ({
         ...prev,
@@ -62,21 +64,21 @@ export const useGallery = (initialCount: number = 100): UseGalleryReturn => {
         error: error instanceof Error ? error.message : 'Failed to load photos',
       }));
     }
-  }, [initialCount, endCursor]);
+  }, [initialCount]);
 
   const refresh = useCallback(async () => {
-    setEndCursor(undefined);
+    endCursorRef.current = undefined;
     await loadPhotos(true);
   }, [loadPhotos]);
 
   const loadMore = useCallback(async () => {
-    if (!hasNextPage || state.loading) return;
+    if (!hasNextPageRef.current || state.loading) return;
     await loadPhotos(false);
-  }, [hasNextPage, state.loading, loadPhotos]);
+  }, [state.loading, loadPhotos]);
 
   useEffect(() => {
     loadPhotos(true);
-  }, []);
+  }, [loadPhotos]);
 
   return {
     ...state,
