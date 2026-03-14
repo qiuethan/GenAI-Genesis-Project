@@ -17,7 +17,7 @@ import torchvision
 from PIL import Image
 from torchvision import transforms
 from diffusers import StableDiffusionImg2ImgPipeline, AutoencoderKL
-from diffusers.models.vae import DiagonalGaussianDistribution
+from diffusers.models.autoencoders.vae import DiagonalGaussianDistribution
 
 from app.glaze.utils import load_img, img2tensor, tensor2img, CLIP, check_clip_threshold
 
