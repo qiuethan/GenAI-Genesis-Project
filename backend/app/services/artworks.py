@@ -2,6 +2,7 @@ import logging
 import time
 
 from app.database import get_supabase
+from app.services.glaze_service import glaze_image_bytes
 from app.services.watermark_service import embed_watermark
 
 log = logging.getLogger(__name__)
@@ -18,18 +19,14 @@ def upload_and_create_artwork(
     sb = get_supabase()
     path = f"{artist_id}/{int(time.time())}_{title}.{file_ext}"
 
-    # Upload raw (original) image to private bucket
+    # 1. Glaze the image to protect against AI style mimicry
+    public_bytes = glaze_image_bytes(file_bytes, filename=f"artwork.{file_ext}")
+
+    # 2. Embed invisible watermark for provenance tracking
+    public_bytes, wm_length = embed_watermark(public_bytes, artist_id, file_ext)
+
+    # 3. Upload original to private bucket, glazed+watermarked to public bucket
     sb.storage.from_("artworks-raw").upload(path, file_bytes)
-
-    # Embed invisible watermark with artist ID as provenance marker
-    wm_length = None
-    public_bytes = file_bytes
-    try:
-        public_bytes, wm_length = embed_watermark(file_bytes, artist_id, file_ext)
-    except Exception:
-        log.warning("Watermark embedding failed — uploading without watermark", exc_info=True)
-
-    # Upload watermarked image to public bucket
     sb.storage.from_("artworks-public").upload(path, public_bytes)
 
     # Get public URL for display
