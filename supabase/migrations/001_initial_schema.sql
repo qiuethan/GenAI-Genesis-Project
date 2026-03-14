@@ -31,7 +31,10 @@ create table if not exists public.artworks (
   title text not null,
   description text,
   image_url text not null,
+  protected_image_url text,
+  is_public boolean not null default true,
   style_tags text[] default '{}',
+  wm_length int,                       -- watermark bit length (needed for extraction)
   created_at timestamptz not null default now()
 );
 

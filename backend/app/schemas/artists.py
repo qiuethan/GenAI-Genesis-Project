@@ -6,6 +6,7 @@ from datetime import datetime
 # --- Request schemas ---
 
 class ArtistCreate(BaseModel):
+    user_id: str
     email: str
     display_name: str
     bio: Optional[str] = None

@@ -12,9 +12,16 @@ router = APIRouter()
 
 @router.post("/", response_model=ArtistCreateOut)
 def create_artist(body: ArtistCreate):
-    user = artist_svc.create_user(body.email)
+    # Skip if artist already exists for this user
+    existing = artist_svc.get_artist_by_user_id(body.user_id)
+    if existing:
+        user_row = {"id": body.user_id, "email": body.email, "created_at": ""}
+        settings = artist_svc.get_ai_settings(existing["id"]) or {}
+        return {"user": user_row, "artist": existing, "ai_settings": settings}
+
+    user = artist_svc.create_user(body.user_id, body.email)
     artist = artist_svc.create_artist(
-        user_id=user["id"],
+        user_id=body.user_id,
         display_name=body.display_name,
         bio=body.bio,
         avatar_url=body.avatar_url,
@@ -22,6 +29,14 @@ def create_artist(body: ArtistCreate):
     )
     ai_settings = artist_svc.create_default_ai_settings(artist["id"])
     return {"user": user, "artist": artist, "ai_settings": ai_settings}
+
+
+@router.get("/by-user/{user_id}")
+def get_artist_by_user(user_id: str):
+    artist = artist_svc.get_artist_by_user_id(user_id)
+    if not artist:
+        raise HTTPException(status_code=404, detail="Artist not found")
+    return artist
 
 
 @router.get("/{artist_id}")

@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
-import { supabase } from "../lib/supabase";
 
 interface Artwork {
   id: string;
@@ -17,7 +16,6 @@ export default function Portfolio() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [artworks, setArtworks] = useState<Artwork[]>([]);
-  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [title, setTitle] = useState("");
@@ -27,18 +25,15 @@ export default function Portfolio() {
 
   useEffect(() => {
     if (!user) return;
-    supabase
-      .from("artists")
-      .select("id")
-      .eq("user_id", user.id)
-      .single()
-      .then(({ data, error }) => {
-        if (error || !data) {
-          setError("No artist profile found. Please create one first.");
-          setLoading(false);
-          return;
-        }
-        setArtistId(data.id);
+    fetch(`/api/artists/by-user/${user.id}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("No artist profile found.");
+        return res.json();
+      })
+      .then((data) => setArtistId(data.id))
+      .catch((err) => {
+        setError(err.message);
+        setLoading(false);
       });
   }, [user]);
 
@@ -49,34 +44,14 @@ export default function Portfolio() {
 
   async function loadArtworks() {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("artworks")
-      .select("*")
-      .eq("artist_id", artistId)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-      return;
+    try {
+      const res = await fetch(`/api/artists/${artistId}/artworks`);
+      if (!res.ok) throw new Error("Failed to load artworks");
+      const data = await res.json();
+      setArtworks(data);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load artworks");
     }
-
-    const works = data || [];
-    setArtworks(works);
-
-    // Generate signed URLs for raw images in the private bucket
-    const urls: Record<string, string> = {};
-    for (const art of works) {
-      if (art.protected_image_url) {
-        const { data: signed } = await supabase.storage
-          .from("artworks-raw")
-          .createSignedUrl(art.protected_image_url, 3600);
-        if (signed?.signedUrl) {
-          urls[art.id] = signed.signedUrl;
-        }
-      }
-    }
-    setSignedUrls(urls);
     setLoading(false);
   }
 
@@ -87,62 +62,30 @@ export default function Portfolio() {
     setUploading(true);
     setError(null);
 
-    const ext = file.name.split(".").pop();
-    const path = `${artistId}/${Date.now()}.${ext}`;
+    const formData = new FormData();
+    formData.append("artist_id", artistId);
+    formData.append("title", title.trim());
+    formData.append("description", description.trim());
+    formData.append("file", file);
 
-    // 1. Upload raw image to private bucket
-    const { error: rawError } = await supabase.storage
-      .from("artworks-raw")
-      .upload(path, file);
+    try {
+      const res = await fetch("/api/artworks/upload", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || "Upload failed");
+      }
 
-    if (rawError) {
-      setError(rawError.message);
-      setUploading(false);
-      return;
+      setTitle("");
+      setDescription("");
+      if (fileRef.current) fileRef.current.value = "";
+      loadArtworks();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Upload failed");
     }
-
-    // 2. Upload same image to public bucket as placeholder
-    //    (will be replaced with glazed version later)
-    const { error: pubError } = await supabase.storage
-      .from("artworks-public")
-      .upload(path, file);
-
-    if (pubError) {
-      setError(pubError.message);
-      setUploading(false);
-      return;
-    }
-
-    const { data: pubUrl } = supabase.storage
-      .from("artworks-public")
-      .getPublicUrl(path);
-
-    // 3. Create artwork record with both references
-    const { error: insertError } = await supabase.from("artworks").insert({
-      artist_id: artistId,
-      title: title.trim(),
-      description: description.trim() || null,
-      image_url: pubUrl.publicUrl,
-      protected_image_url: path,
-      is_public: true,
-    });
-
-    if (insertError) {
-      setError(insertError.message);
-      setUploading(false);
-      return;
-    }
-
-    setTitle("");
-    setDescription("");
-    if (fileRef.current) fileRef.current.value = "";
     setUploading(false);
-    loadArtworks();
-  }
-
-  function getDisplayUrl(art: Artwork): string | null {
-    // Show glazed public image if available, fall back to signed raw URL
-    return art.image_url || signedUrls[art.id] || null;
   }
 
   return (
@@ -198,33 +141,27 @@ export default function Portfolio() {
         <p className="text-sm">No artworks yet. Upload your first piece above.</p>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {artworks.map((art) => {
-            const url = getDisplayUrl(art);
-            return (
-              <div key={art.id} className="border border-black">
-                {url ? (
-                  <img
-                    src={url}
-                    alt={art.title}
-                    className="w-full aspect-square object-cover"
-                  />
-                ) : (
-                  <div className="w-full aspect-square bg-gray-100 flex items-center justify-center text-xs">
-                    No preview
-                  </div>
-                )}
-                <div className="p-3">
-                  <p className="font-semibold text-sm">{art.title}</p>
-                  {art.description && (
-                    <p className="text-xs mt-1">{art.description}</p>
-                  )}
-                  <p className="text-xs mt-1">
-                    {art.image_url ? "Public (glazed)" : "Pending glazing"}
-                  </p>
+          {artworks.map((art) => (
+            <div key={art.id} className="border border-black">
+              {art.image_url ? (
+                <img
+                  src={art.image_url}
+                  alt={art.title}
+                  className="w-full aspect-square object-cover"
+                />
+              ) : (
+                <div className="w-full aspect-square bg-gray-100 flex items-center justify-center text-xs">
+                  No preview
                 </div>
+              )}
+              <div className="p-3">
+                <p className="font-semibold text-sm">{art.title}</p>
+                {art.description && (
+                  <p className="text-xs mt-1">{art.description}</p>
+                )}
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       )}
     </div>

@@ -19,4 +19,5 @@ class ArtworkOut(BaseModel):
     image_url: str
     protected_image_url: Optional[str] = None
     is_public: bool
+    wm_length: Optional[int] = None
     created_at: str

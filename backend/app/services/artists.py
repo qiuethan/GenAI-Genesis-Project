@@ -1,10 +1,20 @@
 from app.database import get_supabase
 
 
-def create_user(email: str) -> dict:
+def create_user(user_id: str, email: str) -> dict:
     sb = get_supabase()
-    result = sb.table("users").insert({"email": email}).execute()
+    result = (
+        sb.table("users")
+        .upsert({"id": user_id, "email": email}, on_conflict="id")
+        .execute()
+    )
     return result.data[0]
+
+
+def get_artist_by_user_id(user_id: str) -> dict | None:
+    sb = get_supabase()
+    result = sb.table("artists").select("*").eq("user_id", user_id).execute()
+    return result.data[0] if result.data else None
 
 
 def create_artist(user_id: str, display_name: str, bio: str = None,

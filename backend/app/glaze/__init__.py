@@ -5,4 +5,5 @@ Original code by University of Chicago SAND Lab.
 Fixed decompilation artifacts, removed PyQt5 dependency, added MPS support.
 """
 
-from glaze.glazing import Glaze  # noqa: F401
+from app.glaze.glazing import Glaze  # noqa: F401
+from app.glaze.downloader import download_all_resources  # noqa: F401
