@@ -1,0 +1,186 @@
+{
+  "name": "frame",
+  "entryPoint": "src/app/App.tsx",
+  "exclude": [
+    "node_modules/**",
+    "dist/**",
+    "build/**",
+    "coverage/**",
+    ".expo/**",
+    "ios/**",
+    "android/**"
+  ],
+  "layers": [
+    { "name": "app", "description": "App shell: entry, navigation, providers" },
+    { "name": "features", "description": "Vertical product features (camera, gallery, settings)" },
+    { "name": "shared", "description": "Shared reusable UI, hooks, utils, types" },
+    { "name": "infra", "description": "Integrations & native wrappers (camera, media library, fs)" }
+  ],
+  "layerMappings": [
+    { "layer": "app", "include": ["src/app/**"], "priority": 100 },
+    { "layer": "features", "include": ["src/features/**"], "priority": 90 },
+    { "layer": "shared", "include": ["src/shared/**"], "priority": 80 },
+    { "layer": "infra", "include": ["src/infra/**"], "priority": 70 }
+  ],
+  "contextMappings": [
+    {
+      "context": "camera",
+      "include": ["src/features/camera/**"],
+      "public": ["src/features/camera/api/**"],
+      "priority": 50
+    },
+    {
+      "context": "gallery",
+      "include": ["src/features/gallery/**"],
+      "public": ["src/features/gallery/api/**"],
+      "priority": 50
+    },
+    {
+      "context": "settings",
+      "include": ["src/features/settings/**"],
+      "public": ["src/features/settings/api/**"],
+      "priority": 50
+    },
+    {
+      "context": "shared",
+      "include": ["src/shared/**"],
+      "public": ["src/shared/**"],
+      "priority": 10
+    },
+    {
+      "context": "infra",
+      "include": ["src/infra/**"],
+      "public": ["src/infra/**"],
+      "priority": 10
+    },
+    {
+      "context": "app",
+      "include": ["src/app/**"],
+      "public": ["src/app/**"],
+      "priority": 10
+    }
+  ],
+  "capabilities": [
+    {
+      "type": "camera",
+      "imports": ["react-native-vision-camera"],
+      "calls": [],
+      "description": "Direct camera access"
+    },
+    {
+      "type": "media",
+      "imports": ["expo-media-library", "@react-native-camera-roll/camera-roll"],
+      "calls": [],
+      "description": "Photo library access"
+    },
+    {
+      "type": "filesystem",
+      "imports": ["expo-file-system"],
+      "calls": [],
+      "description": "Local file I/O"
+    },
+    {
+      "type": "network",
+      "imports": ["axios"],
+      "calls": ["fetch"],
+      "description": "Network access"
+    }
+  ],
+  "rules": [
+    {
+      "kind": "allowed-layer-import",
+      "id": "app-imports",
+      "title": "App shell imports",
+      "description": "App shell can import app/features/shared/infra",
+      "fromLayer": "app",
+      "allowedLayers": ["app", "features", "shared", "infra"]
+    },
+    {
+      "kind": "allowed-layer-import",
+      "id": "features-imports",
+      "title": "Feature imports",
+      "description": "Features can import shared + infra. Cross-feature imports are controlled by contexts.",
+      "fromLayer": "features",
+      "allowedLayers": ["features", "shared", "infra"]
+    },
+    {
+      "kind": "allowed-layer-import",
+      "id": "shared-imports",
+      "title": "Shared purity",
+      "description": "Shared must stay feature-agnostic",
+      "fromLayer": "shared",
+      "allowedLayers": ["shared"]
+    },
+    {
+      "kind": "allowed-layer-import",
+      "id": "infra-imports",
+      "title": "Infra boundaries",
+      "description": "Infra can import shared/infra but not app/features",
+      "fromLayer": "infra",
+      "allowedLayers": ["infra", "shared"]
+    },
+    {
+      "kind": "context-visibility",
+      "id": "vertical-boundaries",
+      "title": "Vertical feature boundaries",
+      "description": "App composes features. Features depend on shared/infra only. Cross-feature imports require the target feature's public api/**.",
+      "contexts": [
+        {
+          "context": "app",
+          "canDependOn": ["app", "camera", "gallery", "settings", "shared", "infra"]
+        },
+        { "context": "camera", "canDependOn": ["camera", "shared", "infra"] },
+        { "context": "gallery", "canDependOn": ["gallery", "shared", "infra"] },
+        { "context": "settings", "canDependOn": ["settings", "shared", "infra"] },
+        { "context": "shared", "canDependOn": ["shared"] },
+        { "context": "infra", "canDependOn": ["infra", "shared"] }
+      ]
+    },
+    {
+      "kind": "cyclic-dependency",
+      "id": "no-cycles",
+      "title": "No circular dependencies",
+      "description": "Prevent circular imports"
+    },
+    {
+      "kind": "forbidden-capability",
+      "id": "no-camera-in-features",
+      "title": "No direct camera usage inside features",
+      "description": "Camera primitives must be wrapped in infra/ so feature code stays testable and swappable.",
+      "forbiddenCapabilities": ["camera"],
+      "layer": "features"
+    },
+    {
+      "kind": "forbidden-capability",
+      "id": "no-media-in-features",
+      "title": "No direct media library usage inside features",
+      "description": "Saving to gallery must go through infra/ wrappers.",
+      "forbiddenCapabilities": ["media", "filesystem"],
+      "layer": "features"
+    },
+    {
+      "kind": "allowed-capability",
+      "id": "infra-io-allowed",
+      "title": "Infra allowed capabilities",
+      "description": "Infra is where device I/O lives.",
+      "allowedCapabilities": ["camera", "media", "filesystem", "network"],
+      "layer": "infra"
+    },
+    {
+      "kind": "max-dependencies",
+      "id": "max-deps-features",
+      "title": "Feature dependency limit",
+      "description": "Keep feature modules small and understandable",
+      "maxDependencies": 20,
+      "layer": "features"
+    },
+    {
+      "kind": "external-dependency",
+      "id": "shared-external-deps",
+      "title": "Shared external dependencies",
+      "description": "Shared should stay lightweight; avoid coupling shared to heavy native libs.",
+      "allowedPackages": ["react", "react-native", "@shopify/react-native-skia"],
+      "layer": "shared"
+    }
+  ]
+}
