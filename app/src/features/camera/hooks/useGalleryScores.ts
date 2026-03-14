@@ -1,17 +1,15 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { NativeModules } from 'react-native';
+import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { getServerUrl } from '../../../infra/network/serverUrl';
 
 export interface GalleryScore {
-  score: number;   // 0-100
-  label: string;   // Poor / Fair / Good / Excellent
+  score: number;
+  label: string;
 }
 
-const COMPOSITION_PORT = 8420;
 const STORAGE_KEY = '@composition_scores';
 
-// Module-level cache
 let _scoreCache: Record<string, GalleryScore> = {};
 let _cacheLoaded = false;
 let _cacheLoadPromise: Promise<void> | null = null;
@@ -35,19 +33,6 @@ async function saveCache(): Promise<void> {
   } catch {}
 }
 
-function getBaseUrl(): string {
-  try {
-    const scriptURL = NativeModules.SourceCode?.scriptURL as string | undefined;
-    if (scriptURL) {
-      const match = scriptURL.match(/^https?:\/\/([^:\/]+)/);
-      if (match && match[1] !== 'localhost' && match[1] !== '127.0.0.1') {
-        return `http://${match[1]}:${COMPOSITION_PORT}`;
-      }
-    }
-  } catch {}
-  return `http://172.20.10.2:${COMPOSITION_PORT}`;
-}
-
 /**
  * Score a single photo by sending it to the composition server.
  * Call this after capturing and saving a new photo.
@@ -64,7 +49,7 @@ export async function scorePhoto(photoId: string, photoUri: string): Promise<Gal
     );
 
     const blob = await fetch(processed.uri).then(r => r.blob());
-    const response = await fetch(`${getBaseUrl()}/score`, {
+    const response = await fetch(`${getServerUrl()}/score`, {
       method: 'POST',
       headers: { 'Content-Type': 'image/jpeg' },
       body: blob,

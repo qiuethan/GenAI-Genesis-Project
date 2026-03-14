@@ -92,13 +92,14 @@ export const CameraScreen = () => {
   const scan = useScanMode(cameraRef);
   const scanActive = scan.isSelecting || scan.isScanning;
   const objectDetection = useObjectDetection({
-    enabled: scanActive,
+    enabled: true,
     confidenceThreshold: 0.3,
     skipFrames: 3,
   });
 
-  // Use detection frame processor during scan, analysis frame processor otherwise
-  const frameProcessor = (scanActive && objectDetection.frameProcessor) ? objectDetection.frameProcessor : analysisFrameProcessor;
+  // Use object detection frame processor if available (it self-gates via enabledRef),
+  // otherwise fall back to analysis frame processor
+  const frameProcessor = objectDetection.frameProcessor ?? analysisFrameProcessor;
 
   // Composition assessment via Mac server over USB
   const composition = useCompositionScore({
@@ -228,7 +229,10 @@ export const CameraScreen = () => {
       }
 
       const asset = await saveToLibrary(finalPath);
-      setLastPhoto(asset.uri);
+
+      // Get displayable URI (ph:// can't be loaded by <Image>)
+      const displayUri = await getLatestPhoto();
+      if (displayUri) setLastPhoto(displayUri);
 
       // Score the newly captured photo in the background
       scorePhoto(asset.id, asset.uri).catch(() => {});

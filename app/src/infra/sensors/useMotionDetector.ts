@@ -57,6 +57,7 @@ export const useMotionDetector = (config?: MotionDetectorConfig): MotionState =>
     gyro: { x: 0, y: 0, z: 0 },
     smoothedMagnitude: 0,
     isShaking: false,
+    _lastUpdate: 0,
   });
 
   useEffect(() => {
@@ -96,12 +97,17 @@ export const useMotionDetector = (config?: MotionDetectorConfig): MotionState =>
 
       s.prevAccel = { ...s.accel };
 
-      setState({
-        magnitude: s.smoothedMagnitude,
-        isShaking: s.isShaking,
-        accelMagnitude: normalizedAccel,
-        gyroMagnitude: normalizedGyro,
-      });
+      // Throttle setState to avoid max update depth
+      const now = Date.now();
+      if (!s._lastUpdate || now - s._lastUpdate > 100) {
+        s._lastUpdate = now;
+        setState({
+          magnitude: s.smoothedMagnitude,
+          isShaking: s.isShaking,
+          accelMagnitude: normalizedAccel,
+          gyroMagnitude: normalizedGyro,
+        });
+      }
     };
 
     const accelSub = Accelerometer.addListener(data => {

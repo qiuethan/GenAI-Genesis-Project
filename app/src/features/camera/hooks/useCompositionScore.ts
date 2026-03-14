@@ -8,7 +8,6 @@ import { getServerUrl } from '../../../infra/network/serverUrl';
 
 export interface CompositionResult {
   score: number;
-  suggestion: string | null;
   inference_ms: number;
 }
 
@@ -62,7 +61,6 @@ export const useCompositionScore = ({
   cameraRef,
   aspectRatio = '4:3',
   serverUrl,
-  port = COMPOSITION_PORT,
   intervalMs = 1500,
   enabled = true,
 }: UseCompositionScoreConfig) => {
@@ -96,6 +94,9 @@ export const useCompositionScore = ({
   // Stable interval — never restarts
   useEffect(() => {
     const analyze = async () => {
+      if (__DEV__ && Math.random() < 0.2) {
+        console.log(`[Composition] analyze: enabled=${enabledRef.current} camera=${!!cameraRefRef.current.current} inflight=${inflightRef.current} url=${baseUrl}`);
+      }
       if (!enabledRef.current || !cameraRefRef.current.current || inflightRef.current) return;
 
       inflightRef.current = true;
@@ -114,8 +115,7 @@ export const useCompositionScore = ({
         });
 
         if (!response.ok) {
-          // Server error — skip this frame but stay connected
-          return;
+          return; // skip, finally will reset inflight
         }
 
         const data = await response.json();

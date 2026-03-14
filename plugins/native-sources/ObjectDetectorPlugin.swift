@@ -15,9 +15,19 @@ private let cocoLabels: [String] = [
   "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"
 ]
 
+/// Letterbox info: how the original image was placed inside the 640x640 square
+struct LetterboxInfo {
+  let scale: CGFloat      // uniform scale applied to original image
+  let padX: CGFloat       // horizontal padding (left) in pixels in 640x640 space
+  let padY: CGFloat       // vertical padding (top) in pixels in 640x640 space
+  let origWidth: CGFloat  // original image width
+  let origHeight: CGFloat // original image height
+}
+
 @objc(ObjectDetectorPlugin)
 public class ObjectDetectorPlugin: FrameProcessorPlugin {
   private var mlModel: MLModel?
+  private var ciContext = CIContext(options: [.useSoftwareRenderer: false])
   private var logCount = 0
 
   public override init(proxy: VisionCameraProxyHolder, options: [AnyHashable: Any]! = [:]) {
@@ -26,13 +36,13 @@ public class ObjectDetectorPlugin: FrameProcessorPlugin {
   }
 
   private func loadModel() {
-    if let compiledURL = Bundle.main.url(forResource: "yolo11s", withExtension: "mlmodelc") {
-      self.mlModel = try? MLModel(contentsOf: compiledURL)
+    if let url = Bundle.main.url(forResource: "yolo11s", withExtension: "mlmodelc") {
+      self.mlModel = try? MLModel(contentsOf: url)
       if mlModel != nil { print("[ObjectDetector] Loaded yolo11s.mlmodelc"); return }
     }
-    if let packageURL = Bundle.main.url(forResource: "yolo11s", withExtension: "mlpackage") {
-      if let compiledURL = try? MLModel.compileModel(at: packageURL) {
-        self.mlModel = try? MLModel(contentsOf: compiledURL)
+    if let url = Bundle.main.url(forResource: "yolo11s", withExtension: "mlpackage") {
+      if let compiled = try? MLModel.compileModel(at: url) {
+        self.mlModel = try? MLModel(contentsOf: compiled)
         if mlModel != nil { print("[ObjectDetector] Compiled yolo11s.mlpackage"); return }
       }
     }
@@ -42,27 +52,22 @@ public class ObjectDetectorPlugin: FrameProcessorPlugin {
   public override func callback(_ frame: Frame, withArguments arguments: [AnyHashable: Any]?) -> Any? {
     guard let mlModel = self.mlModel else { return [] as [[String: Any]] }
     let confThreshold = (arguments?["confidence"] as? NSNumber)?.floatValue ?? 0.3
-
     guard let pixelBuffer = CMSampleBufferGetImageBuffer(frame.buffer) else {
       return [] as [[String: Any]]
     }
 
-    // Run CoreML directly (not via VNCoreMLRequest which mangles the output)
-    let imgWidth = CVPixelBufferGetWidth(pixelBuffer)
-    let imgHeight = CVPixelBufferGetHeight(pixelBuffer)
+    let origW = CGFloat(CVPixelBufferGetWidth(pixelBuffer))
+    let origH = CGFloat(CVPixelBufferGetHeight(pixelBuffer))
 
-    // Resize to 640x640 for model input
-    guard let resized = resizePixelBuffer(pixelBuffer, width: 640, height: 640) else {
+    // Letterbox to 640x640
+    guard let (letterboxed, info) = letterboxPixelBuffer(pixelBuffer, targetSize: 640) else {
       return [] as [[String: Any]]
     }
 
     do {
-      let input = try MLDictionaryFeatureProvider(dictionary: [
-        "image": resized,
-      ])
+      let input = try MLDictionaryFeatureProvider(dictionary: ["image": letterboxed])
       let prediction = try mlModel.prediction(from: input)
 
-      // Get the raw output tensor
       var rawOutput: MLMultiArray?
       for name in prediction.featureNames {
         if let arr = prediction.featureValue(for: name)?.multiArrayValue {
@@ -70,40 +75,73 @@ public class ObjectDetectorPlugin: FrameProcessorPlugin {
           break
         }
       }
+      guard let output = rawOutput else { return [] as [[String: Any]] }
 
-      guard let output = rawOutput else {
-        if logCount < 3 { print("[ObjectDetector] No output tensor found"); logCount += 1 }
-        return [] as [[String: Any]]
-      }
-
-      // Debug log first few calls
       if logCount < 3 {
-        print("[ObjectDetector] Output shape: \(output.shape), strides: \(output.strides)")
+        print("[ObjectDetector] Output shape: \(output.shape) origSize: \(origW)x\(origH) scale: \(info.scale) pad: \(info.padX),\(info.padY)")
         logCount += 1
       }
 
-      return parseOutput(output, confThreshold: confThreshold)
+      return parseOutput(output, confThreshold: confThreshold, info: info)
     } catch {
-      if logCount < 5 { print("[ObjectDetector] Prediction error: \(error)"); logCount += 1 }
+      if logCount < 5 { print("[ObjectDetector] Error: \(error)"); logCount += 1 }
       return [] as [[String: Any]]
     }
   }
 
-  private func parseOutput(_ output: MLMultiArray, confThreshold: Float) -> [[String: Any]] {
-    // Expected shape: [1, 84, 8400]
-    guard output.shape.count == 3 else { return [] }
+  // MARK: - Letterboxing
 
+  /// Letterbox: scale uniformly to fit inside targetSize x targetSize, pad with black
+  private func letterboxPixelBuffer(_ buffer: CVPixelBuffer, targetSize: Int) -> (CVPixelBuffer, LetterboxInfo)? {
+    let origW = CGFloat(CVPixelBufferGetWidth(buffer))
+    let origH = CGFloat(CVPixelBufferGetHeight(buffer))
+    let target = CGFloat(targetSize)
+
+    // Uniform scale to fit
+    let scale = min(target / origW, target / origH)
+    let newW = origW * scale
+    let newH = origH * scale
+    let padX = (target - newW) / 2.0
+    let padY = (target - newH) / 2.0
+
+    let info = LetterboxInfo(scale: scale, padX: padX, padY: padY, origWidth: origW, origHeight: origH)
+
+    // Create output buffer
+    var output: CVPixelBuffer?
+    let attrs = [
+      kCVPixelBufferCGImageCompatibilityKey: kCFBooleanTrue!,
+      kCVPixelBufferCGBitmapContextCompatibilityKey: kCFBooleanTrue!,
+    ] as CFDictionary
+    CVPixelBufferCreate(kCFAllocatorDefault, targetSize, targetSize,
+                        kCVPixelFormatType_32BGRA, attrs, &output)
+    guard let out = output else { return nil }
+
+    // Fill with black
+    CVPixelBufferLockBaseAddress(out, [])
+    let baseAddr = CVPixelBufferGetBaseAddress(out)!
+    memset(baseAddr, 0, CVPixelBufferGetDataSize(out))
+    CVPixelBufferUnlockBaseAddress(out, [])
+
+    // Scale and position the image
+    let ciImage = CIImage(cvPixelBuffer: buffer)
+    let scaled = ciImage
+      .transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+      .transformed(by: CGAffineTransform(translationX: padX, y: padY))
+
+    ciContext.render(scaled, to: out)
+    return (out, info)
+  }
+
+  // MARK: - Output parsing
+
+  private func parseOutput(_ output: MLMultiArray, confThreshold: Float, info: LetterboxInfo) -> [[String: Any]] {
+    guard output.shape.count == 3 else { return [] }
     let dim1 = output.shape[1].intValue  // 84
     let dim2 = output.shape[2].intValue  // 8400
-    let numClasses = dim1 - 4            // 80
-
-    guard numClasses == 80 else {
-      if logCount < 3 { print("[ObjectDetector] Unexpected dims: \(dim1)x\(dim2)"); logCount += 1 }
-      return []
-    }
+    let numClasses = dim1 - 4
+    guard numClasses == 80 else { return [] }
 
     let ptr = output.dataPointer.bindMemory(to: Float.self, capacity: output.count)
-
     var detections: [[String: Any]] = []
 
     for i in 0..<dim2 {
@@ -115,16 +153,23 @@ public class ObjectDetectorPlugin: FrameProcessorPlugin {
       }
       if bestConf < confThreshold { continue }
 
-      let cx = ptr[0 * dim2 + i]
-      let cy = ptr[1 * dim2 + i]
-      let w  = ptr[2 * dim2 + i]
-      let h  = ptr[3 * dim2 + i]
+      // Coords in 640x640 model space
+      let cx = CGFloat(ptr[0 * dim2 + i])
+      let cy = CGFloat(ptr[1 * dim2 + i])
+      let w  = CGFloat(ptr[2 * dim2 + i])
+      let h  = CGFloat(ptr[3 * dim2 + i])
 
-      // Normalize from 640x640 model space to 0-1 (in landscape buffer coords)
-      let x1 = Double(max(0, (cx - w / 2)) / 640.0)
-      let y1 = Double(max(0, (cy - h / 2)) / 640.0)
-      let x2 = Double(min(1, (cx + w / 2) / 640.0))
-      let y2 = Double(min(1, (cy + h / 2) / 640.0))
+      // Remove letterbox padding and scale back to original image coords
+      let ox1 = (cx - w / 2 - info.padX) / info.scale
+      let oy1 = (cy - h / 2 - info.padY) / info.scale
+      let ox2 = (cx + w / 2 - info.padX) / info.scale
+      let oy2 = (cy + h / 2 - info.padY) / info.scale
+
+      // Normalize to 0-1 relative to original image
+      let x1 = Double(max(0, ox1) / info.origWidth)
+      let y1 = Double(max(0, oy1) / info.origHeight)
+      let x2 = Double(min(info.origWidth, ox2) / info.origWidth)
+      let y2 = Double(min(info.origHeight, oy2) / info.origHeight)
 
       let label = bestCls < cocoLabels.count ? cocoLabels[bestCls] : "cls_\(bestCls)"
       detections.append([
@@ -155,26 +200,5 @@ public class ObjectDetectorPlugin: FrameProcessorPlugin {
     let inter = max(0, ix2 - ix1) * max(0, iy2 - iy1)
     let union = (ax2 - ax1) * (ay2 - ay1) + (bx2 - bx1) * (by2 - by1) - inter
     return inter / (union + 1e-6)
-  }
-
-  private func resizePixelBuffer(_ buffer: CVPixelBuffer, width: Int, height: Int) -> CVPixelBuffer? {
-    var output: CVPixelBuffer?
-    let attrs = [
-      kCVPixelBufferCGImageCompatibilityKey: kCFBooleanTrue!,
-      kCVPixelBufferCGBitmapContextCompatibilityKey: kCFBooleanTrue!,
-    ] as CFDictionary
-
-    CVPixelBufferCreate(kCFAllocatorDefault, width, height,
-                        kCVPixelFormatType_32BGRA, attrs, &output)
-    guard let out = output else { return nil }
-
-    let ciImage = CIImage(cvPixelBuffer: buffer)
-    let sx = CGFloat(width) / CGFloat(CVPixelBufferGetWidth(buffer))
-    let sy = CGFloat(height) / CGFloat(CVPixelBufferGetHeight(buffer))
-    let scaled = ciImage.transformed(by: CGAffineTransform(scaleX: sx, y: sy))
-
-    let ctx = CIContext(options: [.useSoftwareRenderer: false])
-    ctx.render(scaled, to: out)
-    return out
   }
 }

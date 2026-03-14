@@ -85,11 +85,6 @@ export const CompositionScoreOverlay: React.FC<Props> = ({
                   </Text>
                 </View>
 
-                {/* Directional suggestion */}
-                {result.suggestion && (
-                  <Text style={styles.suggestion}>{result.suggestion}</Text>
-                )}
-
                 {/* Inference time */}
                 <Text style={styles.timing}>
                   {result.inference_ms.toFixed(0)}ms

@@ -1,13 +1,13 @@
 import { useState, useRef, useCallback, useMemo } from 'react';
-import { NativeModules } from 'react-native';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { CameraHandle } from '../../../infra/visionCamera';
 import type { Detection } from '../../../infra/visionCamera';
+import { getServerUrl } from '../../../infra/network/serverUrl';
 
 export interface SelectedObject {
   id: string;
   label: string;
-  box_norm: [number, number, number, number]; // [x1,y1,x2,y2] 0-1
+  box_norm: [number, number, number, number];
 }
 
 export interface ScanResult {
@@ -18,21 +18,8 @@ export interface ScanResult {
 
 export type { Detection as DetectedObject };
 
-const COMPOSITION_PORT = 8420;
 const SCAN_DURATION_MS = 6000;
 const CAPTURE_INTERVAL_MS = 500;
-
-function getBaseUrl(): string {
-  try {
-    const scriptURL = NativeModules.SourceCode?.scriptURL as string | undefined;
-    if (scriptURL) {
-      const match = scriptURL.match(/^https?:\/\/([^:\/]+)/);
-      if (match && match[1] !== 'localhost' && match[1] !== '127.0.0.1')
-        return `http://${match[1]}:${COMPOSITION_PORT}`;
-    }
-  } catch {}
-  return `http://172.20.10.2:${COMPOSITION_PORT}`;
-}
 
 /**
  * Scan mode hook.
@@ -52,7 +39,7 @@ export const useScanMode = (
   const [result, setResult] = useState<ScanResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const baseUrl = useMemo(() => getBaseUrl(), []);
+  const baseUrl = useMemo(() => getServerUrl(), []);
   const cameraRefRef = useRef(cameraRef);
   cameraRefRef.current = cameraRef;
   const selectedRef = useRef<SelectedObject[]>([]);

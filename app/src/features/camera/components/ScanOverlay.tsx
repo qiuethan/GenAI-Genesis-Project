@@ -7,9 +7,7 @@ interface Props {
   isSelecting: boolean;
   isScanning: boolean;
   hasResult: boolean;
-  /** Only show boxes for selected objects (tracked live via YOLO) */
   selectedObjects: SelectedObject[];
-  /** Live detections from on-device YOLO (used to update selected object positions) */
   detections: Detection[];
   progress: number;
   result: ScanResult | null;
@@ -28,11 +26,11 @@ export const ScanOverlay: React.FC<Props> = ({
   onStartScan, onCancel,
   cameraFrameTop, cameraFrameHeight, cameraFrameWidth,
 }) => {
-  if (!isSelecting && !isScanning && !hasResult) return null;
+  const hasSelected = selectedObjects.length > 0;
+  if (!isSelecting && !isScanning && !hasResult && !hasSelected) return null;
 
-  // For each selected object, find its latest position from live detections
+  // Match each selected object to its live YOLO detection
   const trackedBoxes = selectedObjects.map(sel => {
-    // Find the closest matching detection by label + position
     const match = detections.find(d =>
       d.label === sel.label &&
       Math.abs((d.x1 + d.x2) / 2 - (sel.box_norm[0] + sel.box_norm[2]) / 2) < 0.3
@@ -46,30 +44,8 @@ export const ScanOverlay: React.FC<Props> = ({
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-      {/* DEBUG: Draw ALL detections as white boxes */}
-      {(isSelecting || isScanning) && detections.map((det, i) => {
-        const isSelected = selectedObjects.some(s => s.label === det.label &&
-          Math.abs((s.box_norm[0] + s.box_norm[2]) / 2 - (det.x1 + det.x2) / 2) < 0.2);
-        const left = det.x1 * cameraFrameWidth;
-        const top2 = cameraFrameTop + det.y1 * cameraFrameHeight;
-        const w = (det.x2 - det.x1) * cameraFrameWidth;
-        const h = (det.y2 - det.y1) * cameraFrameHeight;
-        return (
-          <View key={`all_${i}`} style={[s.objectBox, {
-            left, top: top2, width: w, height: h,
-            borderColor: isSelected ? '#00ff88' : '#ffffff',
-          }]} pointerEvents="none">
-            <View style={[s.labelBg, { backgroundColor: isSelected ? '#00ff88' : 'rgba(0,0,0,0.6)' }]}>
-              <Text style={[s.labelText, { color: isSelected ? 'black' : 'white' }]}>
-                {det.label} {Math.round(det.confidence * 100)}%
-              </Text>
-            </View>
-          </View>
-        );
-      })}
-
-      {/* Draw tracked selected objects (green boxes that follow) */}
-      {(isSelecting || isScanning) && trackedBoxes.map((obj) => {
+      {/* Only draw boxes for selected objects — tracked live via YOLO */}
+      {trackedBoxes.map((obj) => {
         const [nx1, ny1, nx2, ny2] = obj.liveBox;
         const left = nx1 * cameraFrameWidth;
         const top = cameraFrameTop + ny1 * cameraFrameHeight;
@@ -79,21 +55,22 @@ export const ScanOverlay: React.FC<Props> = ({
         return (
           <View
             key={obj.id}
-            style={[
-              s.objectBox,
-              { left, top, width, height,
-                borderColor: obj.isTracked ? '#00ff88' : '#ff4444' }
-            ]}
+            style={[s.objectBox, {
+              left, top, width, height,
+              borderColor: obj.isTracked ? '#00ff88' : '#ff4444',
+            }]}
             pointerEvents="none"
           >
-            <View style={[s.labelBg, { backgroundColor: obj.isTracked ? '#00ff88' : '#ff4444' }]}>
+            <View style={[s.labelBg, {
+              backgroundColor: obj.isTracked ? '#00ff88' : '#ff4444',
+            }]}>
               <Text style={s.labelText}>{obj.label}</Text>
             </View>
           </View>
         );
       })}
 
-      {/* Hint */}
+      {/* Selection mode hint */}
       {isSelecting && (
         <View style={[s.hintBar, { top: cameraFrameTop + 10 }]}>
           <Text style={s.hintText}>
@@ -104,7 +81,7 @@ export const ScanOverlay: React.FC<Props> = ({
         </View>
       )}
 
-      {/* Buttons */}
+      {/* Start scan / cancel buttons */}
       {isSelecting && selectedObjects.length > 0 && (
         <View style={[s.buttonRow, { top: cameraFrameTop + cameraFrameHeight - 70 }]}>
           <TouchableOpacity style={s.cancelBtn} onPress={onCancel}>
@@ -126,7 +103,7 @@ export const ScanOverlay: React.FC<Props> = ({
         </View>
       )}
 
-      {/* Result */}
+      {/* Result: ghost overlay */}
       {hasResult && result && (
         <>
           <Image
@@ -145,6 +122,7 @@ export const ScanOverlay: React.FC<Props> = ({
         </>
       )}
 
+      {/* Error */}
       {error && (
         <View style={[s.hintBar, { top: cameraFrameTop + 50 }]}>
           <Text style={[s.hintText, { color: '#ff4444' }]}>{error}</Text>
