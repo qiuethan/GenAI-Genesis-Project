@@ -88,9 +88,12 @@ class CompositionPredictor:
         # Score levels for weighted mean
         self._score_levels = torch.arange(1, 6, dtype=torch.float32, device=self.device)
 
-        # Remap range: raw model scores of ~1.5-3.5 spread to 0-100
-        self._raw_floor = 1.5   # raw score that maps to 0
-        self._raw_ceil = 3.5    # raw score that maps to 100
+        # Remap range: raw model scores spread to 0-100
+        # floor=1.5 (noise/blank), ceil=4.0 (exceptional composition)
+        # This makes the average casual photo (~2.4 raw) score ~36/100
+        # and requires genuinely good composition (3.0+) to break 60
+        self._raw_floor = 1.5
+        self._raw_ceil = 4.0
 
         # Warmup
         self._warmup()
