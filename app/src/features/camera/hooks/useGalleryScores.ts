@@ -4,7 +4,8 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { getServerUrl } from '../../../infra/network/serverUrl';
 
 export interface GalleryScore {
-  score: number;
+  aesthetic_score: number;
+  score?: number; // backward compat alias
   label: string;
   composition_score?: number;
 }
@@ -58,10 +59,12 @@ export async function scorePhoto(photoId: string, photoUri: string): Promise<Gal
 
     if (!response.ok) return null;
     const data = await response.json();
-    if (data.score === undefined) return null;
+    const aestheticScore = data.aesthetic_score ?? data.score;
+    if (aestheticScore === undefined) return null;
 
     const result: GalleryScore = {
-      score: data.score,
+      aesthetic_score: aestheticScore,
+      score: aestheticScore, // backward compat
       label: data.label,
       composition_score: data.composition_score,
     };

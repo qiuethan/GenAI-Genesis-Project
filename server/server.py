@@ -107,11 +107,11 @@ class CompositionHandler(BaseHTTPRequestHandler):
             debug_dir = os.path.join(os.path.dirname(__file__), 'debug_frames')
             os.makedirs(debug_dir, exist_ok=True)
             ts = time.strftime("%H%M%S")
-            score = result['score']
-            filename = f"{ts}_{score}_{frame.shape[1]}x{frame.shape[0]}.jpg"
+            aes = result['aesthetic_score']
+            filename = f"{ts}_{aes}_{frame.shape[1]}x{frame.shape[0]}.jpg"
             cv2.imwrite(os.path.join(debug_dir, filename), frame)
 
-            print(f"[Analyze] {frame.shape[1]}x{frame.shape[0]} -> {score} in {result['inference_ms']:.0f}ms")
+            print(f"[Analyze] {frame.shape[1]}x{frame.shape[0]} -> aesthetic={aes} in {result['inference_ms']:.0f}ms")
             self._json_response(200, result)
         except Exception as e:
             print(f"[Analyze] ERROR: {e}")
@@ -156,11 +156,11 @@ class CompositionHandler(BaseHTTPRequestHandler):
             check = _detector.check_objects_in_frame(frame, targets)
 
             # Score the frame
-            score_result = _predictor._predict_fast(frame)
-            score = round(score_result['score'] * 100, 1)
+            score_result = _predictor.predict(frame)
 
             self._json_response(200, {
-                'score': score,
+                'aesthetic_score': score_result['aesthetic_score'],
+                'score': score_result['score'],
                 'all_objects_found': check['all_found'],
                 'found_objects': check['found_objects'],
                 'missing': check['missing'],

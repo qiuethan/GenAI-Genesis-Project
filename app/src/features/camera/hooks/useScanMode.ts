@@ -204,7 +204,7 @@ export const useScanMode = (
         // The checkObjectsInFrame function is called from the component with live detections
         capturedFrames.current.push({
           uri,
-          score: data.score ?? 0,
+          score: data.aesthetic_score ?? data.score ?? 0,
           valid: true, // will be updated by component via markLastFrameValid
         });
       } catch {

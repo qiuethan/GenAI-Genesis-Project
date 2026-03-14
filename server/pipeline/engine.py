@@ -110,7 +110,7 @@ class PipelineEngine:
         """Save current frame with overlay."""
         os.makedirs(self._screenshot_dir, exist_ok=True)
         timestamp = time.strftime("%Y%m%d_%H%M%S")
-        score_str = f"{result['score']:.2f}" if result else "unknown"
+        score_str = f"{result.get('aesthetic_score', result.get('score', 0)):.2f}" if result else "unknown"
         filename = f"composition_{timestamp}_{score_str}.png"
         path = os.path.join(self._screenshot_dir, filename)
         cv2.imwrite(path, frame)

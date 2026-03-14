@@ -49,8 +49,8 @@ export const GalleryScreen = () => {
         />
         {score && (
           <View style={badgeStyles.badgeContainer}>
-            <View style={[badgeStyles.badge, { backgroundColor: scoreToColor(score.score) }]}>
-              <Text style={badgeStyles.text}>👁 {score.score}</Text>
+            <View style={[badgeStyles.badge, { backgroundColor: scoreToColor(score.aesthetic_score) }]}>
+              <Text style={badgeStyles.text}>👁 {Math.round(score.aesthetic_score)}</Text>
             </View>
             {score.composition_score != null && (
               <View style={[badgeStyles.badge, { backgroundColor: scoreToColor(score.composition_score) }]}>

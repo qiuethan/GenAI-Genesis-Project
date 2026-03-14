@@ -40,7 +40,8 @@ export const CompositionScoreOverlay: React.FC<Props> = ({
 
   if (!result && !connected) return null;
 
-  const aestheticColor = result ? scoreToColor(result.score) : '#888';
+  const aestheticScore = result ? (result.aesthetic_score ?? result.score ?? 0) : 0;
+  const aestheticColor = result ? scoreToColor(aestheticScore) : '#888';
   const compositionColor = result?.composition_score != null
     ? scoreToColor(result.composition_score)
     : '#888';
@@ -59,7 +60,7 @@ export const CompositionScoreOverlay: React.FC<Props> = ({
                 <View style={styles.scoreRow}>
                   <Text style={styles.icon}>👁</Text>
                   <Text style={[styles.score, { color: aestheticColor }]}>
-                    {Math.round(result.score)}
+                    {Math.round(aestheticScore)}
                   </Text>
                 </View>
 

@@ -73,7 +73,7 @@ def draw_overlay(frame: np.ndarray, result: dict | None,
     bar_y = h - bar_height
 
     if result is not None:
-        score = result['score']
+        score = result.get('aesthetic_score', result.get('score', 0))
         label = result['label']
         dist = result['distribution']
         color = score_to_color(score)

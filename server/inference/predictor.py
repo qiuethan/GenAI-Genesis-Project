@@ -112,8 +112,8 @@ class ImagePredictor:
         return self.transform(rgb).unsqueeze(0).to(self.device)
 
     def _predict_tanet(self, tensor: torch.Tensor) -> dict:
-        score = float(self.tanet(tensor).item())
-        return {'score': round(score * 100, 1)}
+        score = round(float(self.tanet(tensor).item()) * 100, 1)
+        return {'aesthetic_score': score, 'score': score}
 
     def _predict_samp(self, tensor: torch.Tensor, frame_bgr: np.ndarray) -> dict:
         # Compute saliency map
