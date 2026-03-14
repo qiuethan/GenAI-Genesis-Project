@@ -103,7 +103,10 @@ class CompositionHandler(BaseHTTPRequestHandler):
             filename = f"{ts}_{score:.3f}_{frame.shape[1]}x{frame.shape[0]}.jpg"
             cv2.imwrite(os.path.join(debug_dir, filename), frame)
 
-            print(f"[Analyze] {frame.shape[1]}x{frame.shape[0]} -> {score:.3f} in {result['inference_ms']:.0f}ms")
+            sug = result.get('suggestion', '')
+            trend = result.get('trend', '')
+            sug_str = f' "{sug}"' if sug else ''
+            print(f"[Analyze] {frame.shape[1]}x{frame.shape[0]} -> {score:.3f} [{trend}]{sug_str} in {result['inference_ms']:.0f}ms")
             self._json_response(200, result)
         except Exception as e:
             print(f"[Analyze] ERROR: {e}")

@@ -11,8 +11,8 @@ interface Props {
 }
 
 const scoreToColor = (score: number): string => {
-  // score is 0-1 raw from TANet
-  const t = Math.max(0, Math.min(1, score));
+  // score is 0-100
+  const t = Math.max(0, Math.min(1, score / 100));
   if (t < 0.25) return '#ff4444';
   if (t < 0.5) return '#ff9900';
   if (t < 0.75) return '#aacc00';
@@ -81,9 +81,14 @@ export const CompositionScoreOverlay: React.FC<Props> = ({
                 {/* Score */}
                 <View style={styles.scoreSection}>
                   <Text style={[styles.score, { color }]}>
-                    {result.score.toFixed(3)}
+                    {Math.round(result.score)}
                   </Text>
                 </View>
+
+                {/* Directional suggestion */}
+                {result.suggestion && (
+                  <Text style={styles.suggestion}>{result.suggestion}</Text>
+                )}
 
                 {/* Inference time */}
                 <Text style={styles.timing}>
@@ -130,10 +135,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
-  aesthetic: {
+  suggestion: {
     fontSize: 11,
-    color: '#aaa',
-    fontVariant: ['tabular-nums'],
+    color: '#ffcc00',
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 4,
+    maxWidth: 110,
   },
   tip: {
     fontSize: 10,

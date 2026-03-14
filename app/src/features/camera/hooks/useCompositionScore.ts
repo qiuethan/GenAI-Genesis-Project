@@ -7,6 +7,7 @@ import { AspectRatio } from '../types';
 
 export interface CompositionResult {
   score: number;           // 0-1 raw TANet score
+  suggestion: string | null; // directional coaching tip
   inference_ms: number;
 }
 
