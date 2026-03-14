@@ -17,6 +17,7 @@ import {
   useZoom,
   formatZoomDisplay,
   useAnalysisFrameProcessor,
+  useObjectDetection,
 } from '../../../infra/visionCamera';
 import { saveToLibrary } from '../../../infra/mediaLibrary/saveToLibrary';
 import { getLatestPhoto } from '../../../infra/mediaLibrary/getLatestPhoto';
@@ -28,11 +29,12 @@ import { IconButton } from '../components/IconButton';
 import { RotatableView } from '../components/RotatableView';
 import { ShutterFlash, ShutterFlashHandle } from '../components/ShutterFlash';
 import { CameraControlsMenu } from '../components/CameraControlsMenu';
-import { useTimer, useNightMode, useExposure, useFocus, useShakeCoach, useLevelCoach, useExposureCoach, useCompositionScore, scorePhoto } from '../hooks';
+import { useTimer, useNightMode, useExposure, useFocus, useShakeCoach, useLevelCoach, useExposureCoach, useCompositionScore, scorePhoto, useScanMode } from '../hooks';
 import { ShakeCoachOverlay } from '../components/ShakeCoachOverlay';
 import { LevelCoachOverlay } from '../components/LevelCoachOverlay';
 import { ExposureCoachOverlay } from '../components/ExposureCoachOverlay';
 import { CompositionScoreOverlay } from '../components/CompositionScoreOverlay';
+import { ScanOverlay } from '../components/ScanOverlay';
 import { DevTools } from '../components/DevTools';
 
 export const CameraScreen = () => {
@@ -59,7 +61,7 @@ export const CameraScreen = () => {
   const device = useSelfCameraDevice(position);
   const { zoom, config: zoomConfig, setZoom, onPinchBegan, onPinchUpdate, onPinchEnd, isPinching } = useZoom(device);
 
-  const frameProcessor = useAnalysisFrameProcessor({
+  const analysisFrameProcessor = useAnalysisFrameProcessor({
     onExposureMetrics: exposureCoach.onMetrics,
     enabled: true,
   });
@@ -86,11 +88,23 @@ export const CameraScreen = () => {
   const insets = useSafeAreaInsets();
   const orientation = useDeviceOrientation();
 
+  // Scan mode + on-device object detection
+  const scan = useScanMode(cameraRef);
+  const scanActive = scan.isSelecting || scan.isScanning;
+  const objectDetection = useObjectDetection({
+    enabled: scanActive,
+    confidenceThreshold: 0.3,
+    skipFrames: 3,
+  });
+
+  // Use detection frame processor during scan, analysis frame processor otherwise
+  const frameProcessor = (scanActive && objectDetection.frameProcessor) ? objectDetection.frameProcessor : analysisFrameProcessor;
+
   // Composition assessment via Mac server over USB
   const composition = useCompositionScore({
     cameraRef,
     aspectRatio,
-    enabled: true,
+    enabled: !scanActive && !scan.hasResult,
   });
 
   // Mapping device orientation to UI rotation
@@ -284,8 +298,16 @@ export const CameraScreen = () => {
           style={{ flex: 1 }}
           onPress={(event) => {
             const { locationX, locationY } = event.nativeEvent;
-            // Pass raw coordinates in points (relative to camera view)
-            focus.focus({ x: locationX, y: locationY }, cameraRef);
+            if (scan.isSelecting) {
+              // Convert screen tap to normalized camera frame coords (0-1)
+              const nx = locationX / screenWidth;
+              const ny = (locationY - topMargin) / camHeight;
+              if (ny >= 0 && ny <= 1) {
+                scan.tapToSelect(nx, ny, objectDetection.detections);
+              }
+            } else {
+              focus.focus({ x: locationX, y: locationY }, cameraRef);
+            }
           }}
         >
           {device ? (
@@ -382,6 +404,23 @@ export const CameraScreen = () => {
           />
         </Pressable>
       </PinchGestureHandler>
+
+      {/* Scan Mode Overlay */}
+      <ScanOverlay
+        isSelecting={scan.isSelecting}
+        isScanning={scan.isScanning}
+        hasResult={scan.hasResult}
+        detections={objectDetection.detections}
+        selectedObjects={scan.selectedObjects}
+        progress={scan.progress}
+        result={scan.result}
+        error={scan.error}
+        onStartScan={scan.startScan}
+        onCancel={scan.cancel}
+        cameraFrameTop={topMargin}
+        cameraFrameHeight={camHeight}
+        cameraFrameWidth={screenWidth}
+      />
 
       {/* Top Bar: Flash (Left) + Chevron (Center) + Ratio (Right) */}
       <View style={[styles.topBar, { paddingTop: insets.top }]}>
@@ -584,7 +623,16 @@ export const CameraScreen = () => {
           
           {/* Mode Selector */}
           <View style={styles.modeTextWrapper}>
-            <Text style={styles.modeText}>PHOTO</Text>
+            {!scan.isSelecting && !scan.isScanning && !scan.hasResult ? (
+              <View style={{ flexDirection: 'row', gap: 20 }}>
+                <Text style={styles.modeText}>PHOTO</Text>
+                <TouchableOpacity onPress={scan.startSelecting}>
+                  <Text style={[styles.modeText, { color: 'white', opacity: 0.6 }]}>SCAN</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <Text style={[styles.modeText, { color: '#00ff88' }]}>SCAN</Text>
+            )}
           </View>
         </View>
       </View>

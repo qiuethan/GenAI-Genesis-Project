@@ -24,3 +24,5 @@ export { useCompositionScore } from './useCompositionScore';
 export type { CompositionResult, UseCompositionScoreConfig } from './useCompositionScore';
 export { useGalleryScores, scorePhoto } from './useGalleryScores';
 export type { GalleryScore } from './useGalleryScores';
+export { useScanMode } from './useScanMode';
+export type { SelectedObject, ScanResult } from './useScanMode';

@@ -57,11 +57,6 @@ export const useAnalysisFrameProcessor = ({
       
       const roi = new Uint8Array(roiSize * roiSize);
       
-      // Debug log (sample one pixel) - throttling to avoid spam
-      if (frameCount === 0 && Math.random() < 0.05) {
-         console.log(`[FP] Frame: ${width}x${height} Stride: ${stride} Bytes: ${pixels.length} CenterPx: ${pixels[startY * stride + startX]}`);
-         console.log(`[FP] First 5 bytes: ${pixels[0]}, ${pixels[1]}, ${pixels[2]}, ${pixels[3]}, ${pixels[4]}`);
-      }
 
       for (let y = 0; y < roiSize; y++) {
         const srcOffset = (startY + y) * stride + startX;
@@ -88,10 +83,6 @@ export const useAnalysisFrameProcessor = ({
       // 2. Exposure Analysis (Compute unconditionally for debug)
       const exposureMetrics = computeExposureMetrics(roi);
       
-      // Debug result
-      if (frameCount === 0 && Math.random() < 0.05) {
-          console.log(`[FP Metrics] High: ${exposureMetrics.highlightClipPct.toFixed(3)} Low: ${exposureMetrics.shadowClipPct.toFixed(3)} CallbackOK: ${!!onExposureWorklet}`);
-      }
 
       if (onExposureWorklet) {
         onExposureWorklet(exposureMetrics);

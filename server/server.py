@@ -24,10 +24,12 @@ from PIL import Image, ImageOps
 import numpy as np
 
 from .inference.predictor import ImagePredictor
+from .inference.detector import ObjectDetector
 from .setup_model import TANET_PATH, PLACES365_PATH
 
-# Global instance (initialized in main)
+# Global instances (initialized in main)
 _predictor: ImagePredictor | None = None
+_detector: ObjectDetector | None = None
 
 
 def _decode_jpeg_with_exif(jpeg_bytes: bytes) -> np.ndarray:
@@ -58,8 +60,12 @@ class CompositionHandler(BaseHTTPRequestHandler):
             self._json_response(404, {'error': 'not found'})
 
     def do_POST(self):
+        if self.path == '/detect':
+            return self._handle_detect()
         if self.path == '/score':
             return self._handle_score()
+        if self.path == '/scan':
+            return self._handle_scan()
         if self.path != '/analyze':
             self._json_response(404, {'error': 'not found'})
             return
@@ -112,6 +118,58 @@ class CompositionHandler(BaseHTTPRequestHandler):
             print(f"[Analyze] ERROR: {e}")
             self._json_response(500, {'error': str(e)})
 
+    def _handle_detect(self):
+        """Detect all objects in a frame using YOLO. Used when entering scan mode."""
+        content_length = int(self.headers.get('Content-Length', 0))
+        if content_length == 0:
+            self._json_response(400, {'error': 'empty body'})
+            return
+
+        jpeg_data = self.rfile.read(content_length)
+        try:
+            frame = _decode_jpeg_with_exif(jpeg_data)
+            objects = _detector.detect(frame)
+            print(f"[Detect] {frame.shape[1]}x{frame.shape[0]} -> {len(objects)} objects")
+            self._json_response(200, {'objects': objects})
+        except Exception as e:
+            print(f"[Detect] ERROR: {e}")
+            self._json_response(500, {'error': str(e)})
+
+    def _handle_scan(self):
+        """Score a frame and check if selected objects are present using YOLO."""
+        content_length = int(self.headers.get('Content-Length', 0))
+        if content_length == 0:
+            self._json_response(400, {'error': 'empty body'})
+            return
+
+        try:
+            jpeg_data = self.rfile.read(content_length)
+            frame = _decode_jpeg_with_exif(jpeg_data)
+
+            # Parse target objects from query string
+            from urllib.parse import urlparse, parse_qs
+            query = parse_qs(urlparse(self.path).query)
+            targets_json = query.get('targets', ['[]'])[0]
+            import json
+            targets = json.loads(targets_json)
+
+            # Check if all target objects are in frame
+            check = _detector.check_objects_in_frame(frame, targets)
+
+            # Score the frame
+            score_result = _predictor._predict_fast(frame)
+            score = round(score_result['score'] * 100, 1)
+
+            self._json_response(200, {
+                'score': score,
+                'all_objects_found': check['all_found'],
+                'found_objects': check['found_objects'],
+                'missing': check['missing'],
+            })
+        except Exception as e:
+            print(f"[Scan] ERROR: {e}")
+            self._json_response(500, {'error': str(e)})
+
     def _handle_score(self):
         """Lightweight scoring for gallery images — no blur check, no debug save."""
         content_length = int(self.headers.get('Content-Length', 0))
@@ -150,7 +208,7 @@ class CompositionHandler(BaseHTTPRequestHandler):
 
 
 def main():
-    global _predictor
+    global _predictor, _detector
 
     parser = argparse.ArgumentParser(description="Image assessment HTTP server")
     parser.add_argument("--port", type=int, default=8420, help="Port (default: 8420)")
@@ -168,8 +226,9 @@ def main():
         print("CUDA not available, falling back to CPU")
         device = "cpu"
 
-    # Load TANet
+    # Load models
     _predictor = ImagePredictor(TANET_PATH, PLACES365_PATH, device=device)
+    _detector = ObjectDetector(device=device)
 
     # Start threaded server so health checks don't block during inference
     class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
