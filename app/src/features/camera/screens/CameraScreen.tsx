@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Image, useWindowDimensions, Animated, StyleSheet, Pressable } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { cameraStyles as styles } from '../styles';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PinchGestureHandler, PinchGestureHandlerGestureEvent, State } from 'react-native-gesture-handler';
@@ -602,7 +603,7 @@ export const CameraScreen = () => {
               <View style={styles.thumbnailFrame}>
                 <RotatableView rotation={uiRotation}>
                   {lastPhoto ? (
-                    <Image source={{ uri: lastPhoto }} style={styles.thumbnailImage} />
+                    <ExpoImage source={{ uri: lastPhoto }} style={styles.thumbnailImage} />
                   ) : (
                     <View style={[styles.thumbnailImage, { backgroundColor: '#333' }]} />
                   )}
