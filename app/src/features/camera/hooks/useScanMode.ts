@@ -31,7 +31,7 @@ function getBaseUrl(): string {
         return `http://${match[1]}:${COMPOSITION_PORT}`;
     }
   } catch {}
-  return `http://10.0.0.151:${COMPOSITION_PORT}`;
+  return `http://172.20.10.2:${COMPOSITION_PORT}`;
 }
 
 /**

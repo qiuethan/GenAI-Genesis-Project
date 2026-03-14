@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { RefObject } from 'react';
-import { Image, NativeModules } from 'react-native';
+import { Image } from 'react-native';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { CameraHandle } from '../../../infra/visionCamera';
 import { AspectRatio } from '../types';
+import { getServerUrl } from '../../../infra/network/serverUrl';
 
 export interface CompositionResult {
-  score: number;           // 0-1 raw TANet score
-  suggestion: string | null; // directional coaching tip
+  score: number;
+  suggestion: string | null;
   inference_ms: number;
 }
 
@@ -15,23 +16,8 @@ export interface UseCompositionScoreConfig {
   cameraRef: RefObject<CameraHandle | null>;
   aspectRatio?: AspectRatio;
   serverUrl?: string;
-  port?: number;
   intervalMs?: number;
   enabled?: boolean;
-}
-
-const COMPOSITION_PORT = 8420;
-
-function getDevServerHost(): string | null {
-  try {
-    const scriptURL = NativeModules.SourceCode?.scriptURL as string | undefined;
-    if (scriptURL) {
-      const match = scriptURL.match(/^https?:\/\/([^:\/]+)/);
-      if (match && match[1] !== 'localhost' && match[1] !== '127.0.0.1') return match[1];
-      if (match) return match[1];
-    }
-  } catch {}
-  return null;
 }
 
 async function processFrame(fileUri: string, ratio: AspectRatio): Promise<string> {
@@ -94,9 +80,8 @@ export const useCompositionScore = ({
 
   const baseUrl = useMemo(() => {
     if (serverUrl) return serverUrl;
-    const host = getDevServerHost() ?? '10.0.0.151';
-    return `http://${host}:${port}`;
-  }, [serverUrl, port]);
+    return getServerUrl();
+  }, [serverUrl]);
 
   // One-time health check on mount
   useEffect(() => {

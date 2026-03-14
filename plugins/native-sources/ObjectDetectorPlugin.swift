@@ -120,6 +120,7 @@ public class ObjectDetectorPlugin: FrameProcessorPlugin {
       let w  = ptr[2 * dim2 + i]
       let h  = ptr[3 * dim2 + i]
 
+      // Normalize from 640x640 model space to 0-1 (in landscape buffer coords)
       let x1 = Double(max(0, (cx - w / 2)) / 640.0)
       let y1 = Double(max(0, (cy - h / 2)) / 640.0)
       let x2 = Double(min(1, (cx + w / 2) / 640.0))
