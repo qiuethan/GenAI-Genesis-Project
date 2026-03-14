@@ -6,9 +6,7 @@ import { CameraHandle } from '../../../infra/visionCamera';
 import { AspectRatio } from '../types';
 
 export interface CompositionResult {
-  score: number;
-  distribution: number[];
-  label: string;
+  score: number;           // 0-1 raw TANet score
   inference_ms: number;
 }
 
@@ -129,15 +127,19 @@ export const useCompositionScore = ({
           body: blob,
         });
 
-        if (!response.ok) throw new Error(`${response.status}`);
+        if (!response.ok) {
+          // Server error — skip this frame but stay connected
+          return;
+        }
 
         const data = await response.json();
-        if (!data.skipped) {
+        if (!data.skipped && !data.error) {
           resultRef.current = data as CompositionResult;
           connectedRef.current = true;
           setResult(resultRef.current);
         }
       } catch {
+        // Network error (not server error) — mark disconnected
         connectedRef.current = false;
       } finally {
         inflightRef.current = false;

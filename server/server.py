@@ -17,18 +17,17 @@ import json
 import os
 import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from socketserver import ThreadingMixIn
 
 import cv2
 from PIL import Image, ImageOps
 import numpy as np
 
-from .inference.predictor import CompositionPredictor
-from .pipeline.auto_exposure import AutoExposureController
-from .setup_model import download_model, MODEL_PATH
+from .inference.predictor import ImagePredictor
+from .setup_model import TANET_PATH, PLACES365_PATH
 
-# Global instances (initialized in main)
-_predictor: CompositionPredictor | None = None
-_ae: AutoExposureController | None = None
+# Global instance (initialized in main)
+_predictor: ImagePredictor | None = None
 
 
 def _decode_jpeg_with_exif(jpeg_bytes: bytes) -> np.ndarray:
@@ -80,7 +79,7 @@ class CompositionHandler(BaseHTTPRequestHandler):
             return
 
         # Blur rejection — skip frames that are too blurry for reliable scoring
-        BLUR_THRESHOLD = 30.0  # Laplacian variance; below this = too blurry
+        BLUR_THRESHOLD = 250.0  # Laplacian variance; sharp frames are 400+, blurry <200
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         blur_score = cv2.Laplacian(gray, cv2.CV_64F).var()
         if blur_score < BLUR_THRESHOLD:
@@ -88,24 +87,27 @@ class CompositionHandler(BaseHTTPRequestHandler):
             self._json_response(200, {'skipped': True, 'reason': 'too_blurry', 'blur': round(blur_score, 1)})
             return
 
-        t0 = time.perf_counter()
-        result = _predictor.predict(frame)
-        dt = time.perf_counter() - t0
+        try:
+            t0 = time.perf_counter()
+            result = _predictor.predict(frame)
+            dt = time.perf_counter() - t0
 
-        result['inference_ms'] = round(dt * 1000, 1)
-        result['blur'] = round(blur_score, 1)
+            result['inference_ms'] = round(dt * 1000, 1)
+            result['blur'] = round(blur_score, 1)
 
-        # Save incoming frames with timestamp and score
-        debug_dir = os.path.join(os.path.dirname(__file__), 'debug_frames')
-        os.makedirs(debug_dir, exist_ok=True)
-        ts = time.strftime("%H%M%S")
-        score = result['score']
-        label = result['label']
-        filename = f"{ts}_score{score}_{label}_{frame.shape[1]}x{frame.shape[0]}.jpg"
-        cv2.imwrite(os.path.join(debug_dir, filename), frame)
+            # Save debug frame
+            debug_dir = os.path.join(os.path.dirname(__file__), 'debug_frames')
+            os.makedirs(debug_dir, exist_ok=True)
+            ts = time.strftime("%H%M%S")
+            score = result['score']
+            filename = f"{ts}_{score:.3f}_{frame.shape[1]}x{frame.shape[0]}.jpg"
+            cv2.imwrite(os.path.join(debug_dir, filename), frame)
 
-        print(f"[Analyze] {frame.shape[1]}x{frame.shape[0]} -> {score}/100 ({label}) blur={blur_score:.0f} in {result['inference_ms']:.0f}ms")
-        self._json_response(200, result)
+            print(f"[Analyze] {frame.shape[1]}x{frame.shape[0]} -> {score:.3f} in {result['inference_ms']:.0f}ms")
+            self._json_response(200, result)
+        except Exception as e:
+            print(f"[Analyze] ERROR: {e}")
+            self._json_response(500, {'error': str(e)})
 
     def _handle_score(self):
         """Lightweight scoring for gallery images — no blur check, no debug save."""
@@ -121,11 +123,15 @@ class CompositionHandler(BaseHTTPRequestHandler):
             self._json_response(400, {'error': 'invalid image'})
             return
 
-        t0 = time.perf_counter()
-        result = _predictor.predict(frame)
-        dt = time.perf_counter() - t0
-        result['inference_ms'] = round(dt * 1000, 1)
-        self._json_response(200, result)
+        try:
+            t0 = time.perf_counter()
+            result = _predictor.predict(frame)
+            dt = time.perf_counter() - t0
+            result['inference_ms'] = round(dt * 1000, 1)
+            self._json_response(200, result)
+        except Exception as e:
+            print(f"[Score] ERROR: {e}")
+            self._json_response(500, {'error': str(e)})
 
     def _json_response(self, status: int, data: dict):
         body = json.dumps(data).encode('utf-8')
@@ -143,19 +149,11 @@ class CompositionHandler(BaseHTTPRequestHandler):
 def main():
     global _predictor
 
-    parser = argparse.ArgumentParser(description="Composition assessment HTTP server")
+    parser = argparse.ArgumentParser(description="Image assessment HTTP server")
     parser.add_argument("--port", type=int, default=8420, help="Port (default: 8420)")
     parser.add_argument("--host", default="0.0.0.0", help="Host (default: 0.0.0.0)")
     parser.add_argument("--device", default="mps", help="Torch device: mps, cpu, cuda")
-    parser.add_argument("--checkpoint", default=None, help="Path to samp_net.pth")
-    parser.add_argument("--no-ae", action="store_true", help="Disable auto-exposure")
     args = parser.parse_args()
-
-    # Resolve checkpoint
-    checkpoint = args.checkpoint or MODEL_PATH
-    if not os.path.exists(checkpoint):
-        print("Pretrained model not found. Downloading...")
-        checkpoint = download_model()
 
     # Validate device
     import torch
@@ -167,16 +165,14 @@ def main():
         print("CUDA not available, falling back to CPU")
         device = "cpu"
 
-    # Load model
-    _predictor = CompositionPredictor(checkpoint, device=device)
+    # Load TANet
+    _predictor = ImagePredictor(TANET_PATH, PLACES365_PATH, device=device)
 
-    # Auto-exposure
-    if not args.no_ae:
-        _ae = AutoExposureController()
-        print("[Server] Auto-exposure enabled (center-weighted metering)")
+    # Start threaded server so health checks don't block during inference
+    class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+        daemon_threads = True
 
-    # Start server
-    server = HTTPServer((args.host, args.port), CompositionHandler)
+    server = ThreadedHTTPServer((args.host, args.port), CompositionHandler)
     print(f"\n[Server] Composition assessment server running on http://{args.host}:{args.port}")
     print(f"[Server] POST /analyze  - send JPEG, get composition score")
     print(f"[Server] GET  /health   - health check")
