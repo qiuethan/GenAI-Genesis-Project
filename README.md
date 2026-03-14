@@ -19,62 +19,52 @@ The app auto-discovers the server by extracting the Mac's IP from the Metro dev 
 - **Gallery scoring** — Saved photos are scored and displayed with composition badges.
 - **Color filters** — Skia-based filters including vivid, dramatic, mono, silvertone, and noir.
 
-## Prerequisites
+## Quick Setup Guide
 
-- macOS with Apple Silicon (MPS) or CPU fallback
-- iPhone (physical device required for camera)
-- Node.js and npm
-- Python 3.9+
-- Xcode (for the iOS native build)
-- iPhone and Mac on the same Wi-Fi network or connected via USB
+**Prerequisites**: macOS, iPhone connected via USB (trusted), Xcode installed
 
-## Getting Started
+### 1. Accept Xcode license & set developer path
+```bash
+sudo xcodebuild -license accept
+sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+```
 
-### 1. Install JavaScript dependencies
-
+### 2. Install dependencies
 ```bash
 npm install
-```
-
-### 2. Set up the Python environment
-
-```bash
 python3 -m venv venv
 source venv/bin/activate
-pip install -r server/requirements.txt
+pip install torch torchvision einops scipy opencv-contrib-python ultralytics
 ```
 
-### 3. Download pretrained model weights
-
+### 3. Download model weights
 ```bash
 source venv/bin/activate
 python -m server.setup_model
 ```
 
-This downloads TANet, SAMP-Net, and NIMA weights into `server/pretrained_model/`.
-
-### 4. Start the scoring server
-
+### 4. Start the scoring server (Terminal 1)
 ```bash
 source venv/bin/activate
 python -m server.server
 ```
+Wait until you see "Composition assessment server running on http://0.0.0.0:8420"
 
-The server starts on port 8420. Verify with:
-
+### 5. Start Metro bundler (Terminal 2)
 ```bash
-curl http://localhost:8420/health
+npx expo start
 ```
 
-### 5. Build and run the iOS app
-
-In a separate terminal:
-
+### 6. Build & run on iPhone
+Open Xcode:
 ```bash
-npx expo run:ios --device
+open ios/Frame.xcworkspace
 ```
+- Select your iPhone in the device dropdown
+- Set your signing team (Frame target → Signing & Capabilities)
+- Hit **Run** (Cmd+R)
 
-Select your iPhone when prompted. The first build takes a while as it compiles native modules (Vision Camera, Skia, CoreML YOLO, etc.).
+> **Note**: `npx expo run:ios --device` may not work due to a `devicectl` compatibility bug — use Xcode directly instead.
 
 ## Server API
 
