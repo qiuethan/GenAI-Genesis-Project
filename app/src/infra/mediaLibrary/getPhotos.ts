@@ -38,14 +38,14 @@ export const getPhotos = async (
   options: GetPhotosOptions = {}
 ): Promise<GetPhotosResult | null> => {
   const hasPermission = await requestMediaPermission();
-  
+
   if (!hasPermission) {
     return null;
   }
 
   try {
     const { first = 100, after } = options;
-    
+
     const result = await MediaLibrary.getAssetsAsync({
       first,
       after,
@@ -53,9 +53,7 @@ export const getPhotos = async (
       sortBy: [[MediaLibrary.SortBy.creationTime, false]],
     });
 
-    // asset.uri is ph:// — expo-image's <Image> can load these directly,
-    // so no need to call getAssetInfoAsync for each photo.
-    const assets: PhotoAsset[] = result.assets.map((asset) => ({
+    const assets: PhotoAsset[] = result.assets.map(asset => ({
       id: asset.id,
       uri: asset.uri,
       width: asset.width,

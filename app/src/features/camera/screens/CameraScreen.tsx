@@ -18,7 +18,6 @@ import {
   useZoom,
   formatZoomDisplay,
   useAnalysisFrameProcessor,
-  useObjectDetection,
 } from '../../../infra/visionCamera';
 import { saveToLibrary } from '../../../infra/mediaLibrary/saveToLibrary';
 import { getLatestPhoto } from '../../../infra/mediaLibrary/getLatestPhoto';
@@ -30,11 +29,10 @@ import { IconButton } from '../components/IconButton';
 import { RotatableView } from '../components/RotatableView';
 import { ShutterFlash, ShutterFlashHandle } from '../components/ShutterFlash';
 import { CameraControlsMenu } from '../components/CameraControlsMenu';
-import { useTimer, useNightMode, useExposure, useFocus, useShakeCoach, useLevelCoach, useExposureCoach, useCompositionScore, scorePhoto, useScanMode } from '../hooks';
+import { useTimer, useNightMode, useExposure, useFocus, useShakeCoach, useLevelCoach, useExposureCoach, useScanMode, scorePhoto } from '../hooks';
 import { ShakeCoachOverlay } from '../components/ShakeCoachOverlay';
 import { LevelCoachOverlay } from '../components/LevelCoachOverlay';
 import { ExposureCoachOverlay } from '../components/ExposureCoachOverlay';
-import { CompositionScoreOverlay } from '../components/CompositionScoreOverlay';
 import { ScanOverlay } from '../components/ScanOverlay';
 import { DevTools } from '../components/DevTools';
 
@@ -89,26 +87,10 @@ export const CameraScreen = () => {
   const insets = useSafeAreaInsets();
   const orientation = useDeviceOrientation();
 
-  // Scan mode + on-device object detection
+  // Scan mode
   const scan = useScanMode(cameraRef);
-  const scanActive = scan.isSelecting || scan.isScanning;
-  const objectDetection = useObjectDetection({
-    enabled: scanActive,
-    confidenceThreshold: 0.3,
-    skipFrames: 3,
-  });
+  const frameProcessor = analysisFrameProcessor;
 
-  // Use object detection frame processor during scan, analysis frame processor otherwise
-  const frameProcessor = scanActive
-    ? (objectDetection.frameProcessor ?? analysisFrameProcessor)
-    : analysisFrameProcessor;
-
-  // Composition assessment via Mac server over USB
-  const composition = useCompositionScore({
-    cameraRef,
-    aspectRatio,
-    enabled: !scanActive && !scan.hasResult,
-  });
 
   // Mapping device orientation to UI rotation
   const uiRotation = orientation === 0 ? 0 : orientation === 180 ? 180 : orientation === 90 ? 90 : 270;
@@ -232,12 +214,15 @@ export const CameraScreen = () => {
 
       const asset = await saveToLibrary(finalPath);
 
+      // Score the photo if composition guide is active
+      if (scan.guideVisible && scan.guideUri) {
+        scorePhoto(asset.id, asset.uri).catch(() => {});
+      }
+
       // Get displayable URI (ph:// can't be loaded by <Image>)
       const displayUri = await getLatestPhoto();
       if (displayUri) setLastPhoto(displayUri);
 
-      // Score the newly captured photo in the background
-      scorePhoto(asset.id, asset.uri).catch(() => {});
     } catch (e) {
       console.error("Processing failed", e);
     }
@@ -304,16 +289,7 @@ export const CameraScreen = () => {
           style={{ flex: 1 }}
           onPress={(event) => {
             const { locationX, locationY } = event.nativeEvent;
-            if (scan.isSelecting) {
-              // Convert screen tap to normalized camera frame coords (0-1)
-              const nx = locationX / screenWidth;
-              const ny = (locationY - topMargin) / camHeight;
-              if (ny >= 0 && ny <= 1) {
-                scan.tapToSelect(nx, ny, objectDetection.detections);
-              }
-            } else {
-              focus.focus({ x: locationX, y: locationY }, cameraRef);
-            }
+            focus.focus({ x: locationX, y: locationY }, cameraRef);
           }}
         >
           {device ? (
@@ -401,31 +377,64 @@ export const CameraScreen = () => {
             />
           ) : null}
 
-          {/* Composition Score Overlay */}
-          <CompositionScoreOverlay
-            result={composition.result}
-            connected={composition.connected}
-            rotation={uiRotation}
-            cameraFrameTop={topMargin}
-          />
+          {/* Composition Guide Overlay */}
+          {scan.guideUri && scan.guideVisible && (
+            <Image
+              source={{ uri: scan.guideUri }}
+              style={{
+                position: 'absolute',
+                top: topMargin,
+                left: 0,
+                right: 0,
+                height: camHeight,
+                opacity: 0.35,
+              }}
+              resizeMode="cover"
+              pointerEvents="none"
+            />
+          )}
+
         </Pressable>
       </PinchGestureHandler>
 
+      {/* Guide Mode Controls */}
+      {scan.guideUri && (
+        <View style={{ position: 'absolute', top: topMargin + 10, right: 12, zIndex: 60, flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity
+            style={{ backgroundColor: scan.guideVisible ? '#00ff88' : 'rgba(255,255,255,0.3)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 }}
+            onPress={scan.toggleGuide}
+          >
+            <Text style={{ color: scan.guideVisible ? 'black' : 'white', fontSize: 12, fontWeight: '700' }}>
+              {scan.guideVisible ? 'Guide ON' : 'Guide OFF'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{ backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 }}
+            onPress={scan.dismissGuide}
+          >
+            <Text style={{ color: 'white', fontSize: 12, fontWeight: '700' }}>Dismiss</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Scan Mode Overlay */}
       <ScanOverlay
-        isSelecting={scan.isSelecting}
+        isScanMode={scan.isScanMode}
         isScanning={scan.isScanning}
+        isProcessing={scan.isProcessing}
         hasResult={scan.hasResult}
-        detections={objectDetection.detections}
-        selectedObjects={scan.selectedObjects}
-        progress={scan.progress}
         result={scan.result}
         error={scan.error}
+        frameCount={scan.frameCount}
+        scoredCount={scan.scoredCount}
+        countdown={scan.countdown}
         onStartScan={scan.startScan}
-        onCancel={scan.cancel}
+        onStopScan={scan.stopScan}
+        onSaveBest={scan.saveBest}
+        onGuideMode={scan.enterGuideMode}
+        onDone={scan.exitScanMode}
         cameraFrameTop={topMargin}
         cameraFrameHeight={camHeight}
-        cameraFrameWidth={screenWidth}
       />
 
       {/* Top Bar: Flash (Left) + Chevron (Center) + Ratio (Right) */}
@@ -629,15 +638,20 @@ export const CameraScreen = () => {
           
           {/* Mode Selector */}
           <View style={styles.modeTextWrapper}>
-            {!scan.isSelecting && !scan.isScanning && !scan.hasResult ? (
+            {!scan.isScanMode ? (
               <View style={{ flexDirection: 'row', gap: 20 }}>
                 <Text style={styles.modeText}>PHOTO</Text>
-                <TouchableOpacity onPress={scan.startSelecting}>
+                <TouchableOpacity onPress={scan.enterScanMode}>
                   <Text style={[styles.modeText, { color: 'white', opacity: 0.6 }]}>SCAN</Text>
                 </TouchableOpacity>
               </View>
             ) : (
-              <Text style={[styles.modeText, { color: '#00ff88' }]}>SCAN</Text>
+              <View style={{ flexDirection: 'row', gap: 20 }}>
+                <TouchableOpacity onPress={scan.exitScanMode}>
+                  <Text style={[styles.modeText, { color: 'white', opacity: 0.6 }]}>PHOTO</Text>
+                </TouchableOpacity>
+                <Text style={[styles.modeText, { color: '#00ff88' }]}>SCAN</Text>
+              </View>
             )}
           </View>
         </View>
