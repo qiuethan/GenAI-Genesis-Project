@@ -48,8 +48,15 @@ export const GalleryScreen = () => {
           resizeMode="cover"
         />
         {score && (
-          <View style={[badgeStyles.badge, { backgroundColor: scoreToColor(score.score) }]}>
-            <Text style={badgeStyles.text}>{score.score}</Text>
+          <View style={badgeStyles.badgeContainer}>
+            <View style={[badgeStyles.badge, { backgroundColor: scoreToColor(score.score) }]}>
+              <Text style={badgeStyles.text}>👁 {score.score}</Text>
+            </View>
+            {score.composition_score != null && (
+              <View style={[badgeStyles.badge, { backgroundColor: scoreToColor(score.composition_score) }]}>
+                <Text style={badgeStyles.text}>📐 {Math.round(score.composition_score)}</Text>
+              </View>
+            )}
           </View>
         )}
       </TouchableOpacity>
@@ -107,10 +114,14 @@ export const GalleryScreen = () => {
 };
 
 const badgeStyles = StyleSheet.create({
-  badge: {
+  badgeContainer: {
     position: 'absolute',
     bottom: 4,
     right: 4,
+    gap: 2,
+    alignItems: 'flex-end',
+  },
+  badge: {
     borderRadius: 8,
     paddingHorizontal: 5,
     paddingVertical: 1,

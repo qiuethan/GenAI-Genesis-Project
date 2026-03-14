@@ -24,7 +24,7 @@ import { getLatestPhoto } from '../../../infra/mediaLibrary/getLatestPhoto';
 import { useDeviceOrientation } from '../../../infra/sensors/useDeviceOrientation';
 
 import { CaptureButton } from '../components/CaptureButton';
-import { GridOverlay } from '../components/GridOverlay';
+import { CompositionPatternOverlay } from '../components/CompositionPatternOverlay';
 import { IconButton } from '../components/IconButton';
 import { RotatableView } from '../components/RotatableView';
 import { ShutterFlash, ShutterFlashHandle } from '../components/ShutterFlash';
@@ -356,7 +356,10 @@ export const CameraScreen = () => {
             
             {/* Clear Middle with Grid */}
             <Animated.View style={{ height: animatedHeight, width: screenWidth, alignSelf: 'center' }}>
-              <GridOverlay />
+              <CompositionPatternOverlay
+                dominantPattern={composition.result?.dominant_pattern}
+                visible={!scanActive && composition.result?.dominant_pattern !== undefined}
+              />
             </Animated.View>
 
             {/* Bottom Mask */}

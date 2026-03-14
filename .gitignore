@@ -35,6 +35,7 @@ yarn-error.*
 
 # Environment
 .env*.local
+server/.env
 
 # Python
 venv/

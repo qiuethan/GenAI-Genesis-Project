@@ -25,7 +25,7 @@ import numpy as np
 
 from .inference.predictor import ImagePredictor
 from .inference.detector import ObjectDetector
-from .setup_model import TANET_PATH, PLACES365_PATH
+from .setup_model import TANET_PATH, PLACES365_PATH, SAMP_PATH
 
 # Global instances (initialized in main)
 _predictor: ImagePredictor | None = None
@@ -66,6 +66,8 @@ class CompositionHandler(BaseHTTPRequestHandler):
             return self._handle_score()
         if self.path == '/scan':
             return self._handle_scan()
+        if self.path == '/analyze-composition':
+            return self._handle_analyze_composition()
         if self.path != '/analyze':
             self._json_response(404, {'error': 'not found'})
             return
@@ -167,6 +169,59 @@ class CompositionHandler(BaseHTTPRequestHandler):
             print(f"[Scan] ERROR: {e}")
             self._json_response(500, {'error': str(e)})
 
+    def _handle_analyze_composition(self):
+        """Run SAMP-Net + Gemini to produce composition-annotated image."""
+        content_length = int(self.headers.get('Content-Length', 0))
+        if content_length == 0:
+            self._json_response(400, {'error': 'empty body'})
+            return
+
+        jpeg_data = self.rfile.read(content_length)
+        try:
+            frame = _decode_jpeg_with_exif(jpeg_data)
+        except Exception:
+            self._json_response(400, {'error': 'invalid image'})
+            return
+
+        try:
+            import base64
+            from .inference.gemini import analyze_composition_with_gemini
+
+            # Run SAMP-Net to get composition info
+            t0 = time.perf_counter()
+            result = _predictor.predict(frame)
+            dt_model = time.perf_counter() - t0
+
+            composition_type = result.get('dominant_pattern_name', 'Rule of Thirds')
+            attributes = result.get('attributes', {})
+
+            # Re-encode frame as JPEG for Gemini
+            _, jpeg_buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
+            image_bytes = jpeg_buf.tobytes()
+
+            # Call Gemini
+            t1 = time.perf_counter()
+            annotated = analyze_composition_with_gemini(image_bytes, composition_type, attributes)
+            dt_gemini = time.perf_counter() - t1
+
+            if annotated is None:
+                self._json_response(500, {'error': 'Gemini returned no image'})
+                return
+
+            response_data = {
+                'annotated_image': base64.b64encode(annotated).decode('utf-8'),
+                'composition_type': composition_type,
+                'composition_score': result.get('composition_score'),
+                'attributes': attributes,
+                'model_ms': round(dt_model * 1000, 1),
+                'gemini_ms': round(dt_gemini * 1000, 1),
+            }
+            print(f"[AnalyzeComp] {composition_type} | model={dt_model*1000:.0f}ms gemini={dt_gemini*1000:.0f}ms")
+            self._json_response(200, response_data)
+        except Exception as e:
+            print(f"[AnalyzeComp] ERROR: {e}")
+            self._json_response(500, {'error': str(e)})
+
     def _handle_score(self):
         """Lightweight scoring for gallery images — no blur check, no debug save."""
         content_length = int(self.headers.get('Content-Length', 0))
@@ -224,7 +279,7 @@ def main():
         device = "cpu"
 
     # Load models
-    _predictor = ImagePredictor(TANET_PATH, PLACES365_PATH, device=device)
+    _predictor = ImagePredictor(TANET_PATH, PLACES365_PATH, samp_checkpoint_path=SAMP_PATH, device=device)
     _detector = ObjectDetector(device=device)
 
     # Start threaded server so health checks don't block during inference
