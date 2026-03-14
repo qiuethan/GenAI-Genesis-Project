@@ -36,10 +36,12 @@ yarn-error.*
 # Environment
 .env*.local
 
-# Python (server/)
+# Python
+venv/
 server/venv/
 server/pretrained_model/
 server/debug_frames/
 __pycache__/
 *.pyc
 *.pth
+*.egg-info/
