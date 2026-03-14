@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function Auth() {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, user } = useAuth();
+  const navigate = useNavigate();
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,6 +24,7 @@ export default function Auth() {
         setSuccess("Check your email to confirm your account.");
       } else {
         await signIn(email, password);
+        navigate("/dashboard");
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -31,7 +34,7 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white px-4">
+    <div className="flex items-center justify-center bg-white px-4 py-20">
       <div className="w-full max-w-sm space-y-6">
         <h1 className="text-3xl font-bold text-center text-black">
           {isSignUp ? "Create Account" : "Sign In"}

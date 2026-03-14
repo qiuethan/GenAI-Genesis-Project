@@ -18,11 +18,49 @@ interface AuthState {
     displayName?: string
   ) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
+
+async function ensureArtistProfile(user: User) {
+  // Check if artist row already exists for this user
+  const { data: existing } = await supabase
+    .from("artists")
+    .select("id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (existing) return;
+
+  const displayName =
+    user.user_metadata?.display_name ||
+    user.email?.split("@")[0] ||
+    "Artist";
+
+  // Create user row
+  await supabase
+    .from("users")
+    .upsert({ id: user.id, email: user.email }, { onConflict: "id" });
+
+  // Create artist row
+  const { data: artist } = await supabase
+    .from("artists")
+    .insert({ user_id: user.id, display_name: displayName })
+    .select("id")
+    .single();
+
+  if (!artist) return;
+
+  // Create default AI settings
+  await supabase.from("artist_ai_settings").insert({
+    artist_id: artist.id,
+    protection_enabled: true,
+    allow_training: false,
+    allow_generation: true,
+    allow_commercial_licensing: false,
+  });
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -30,19 +68,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      if (session?.user) ensureArtistProfile(session.user);
       setLoading(false);
     });
 
-    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
+      if (session?.user) ensureArtistProfile(session.user);
       setLoading(false);
     });
 
@@ -72,13 +110,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error;
   };
 
-  const signInWithGoogle = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-    });
-    if (error) throw error;
-  };
-
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
@@ -86,7 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ session, user, loading, signUp, signIn, signInWithGoogle, signOut }}
+      value={{ session, user, loading, signUp, signIn, signOut }}
     >
       {children}
     </AuthContext.Provider>
