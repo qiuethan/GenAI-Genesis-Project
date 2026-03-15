@@ -12,6 +12,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import base64
 import io
 import json
 import os
@@ -23,6 +24,8 @@ import cv2
 from PIL import Image, ImageOps
 import numpy as np
 
+from ultralytics import FastSAM
+
 from .inference.predictor import ImagePredictor
 from .inference.detector import ObjectDetector
 from .setup_model import TANET_PATH, PLACES365_PATH, SAMP_PATH
@@ -30,6 +33,7 @@ from .setup_model import TANET_PATH, PLACES365_PATH, SAMP_PATH
 # Global instances (initialized in main)
 _predictor: ImagePredictor | None = None
 _detector: ObjectDetector | None = None
+_fastsam: FastSAM | None = None
 
 
 def _decode_jpeg_with_exif(jpeg_bytes: bytes) -> np.ndarray:
@@ -60,14 +64,14 @@ class CompositionHandler(BaseHTTPRequestHandler):
             self._json_response(404, {'error': 'not found'})
 
     def do_POST(self):
-        if self.path == '/detect':
-            return self._handle_detect()
         if self.path == '/score':
             return self._handle_score()
         if self.path == '/scan':
             return self._handle_scan()
         if self.path == '/analyze-composition':
             return self._handle_analyze_composition()
+        if self.path == '/edges':
+            return self._handle_edges()
         if self.path != '/analyze':
             self._json_response(404, {'error': 'not found'})
             return
@@ -121,8 +125,8 @@ class CompositionHandler(BaseHTTPRequestHandler):
             print(f"[Analyze] ERROR: {e}")
             self._json_response(500, {'error': str(e)})
 
-    def _handle_detect(self):
-        """Detect all objects in a frame using YOLO. Used when entering scan mode."""
+    def _handle_scan(self):
+        """Score a frame during scan mode."""
         content_length = int(self.headers.get('Content-Length', 0))
         if content_length == 0:
             self._json_response(400, {'error': 'empty body'})
@@ -131,18 +135,8 @@ class CompositionHandler(BaseHTTPRequestHandler):
         jpeg_data = self.rfile.read(content_length)
         try:
             frame = _decode_jpeg_with_exif(jpeg_data)
-            objects = _detector.detect(frame)
-            print(f"[Detect] {frame.shape[1]}x{frame.shape[0]} -> {len(objects)} objects")
-            self._json_response(200, {'objects': objects})
-        except Exception as e:
-            print(f"[Detect] ERROR: {e}")
-            self._json_response(500, {'error': str(e)})
-
-    def _handle_scan(self):
-        """Score a frame and check if selected objects are present using YOLO."""
-        content_length = int(self.headers.get('Content-Length', 0))
-        if content_length == 0:
-            self._json_response(400, {'error': 'empty body'})
+        except Exception:
+            self._json_response(400, {'error': 'invalid image'})
             return
 
         try:
@@ -261,6 +255,53 @@ class CompositionHandler(BaseHTTPRequestHandler):
             print(f"[Score] ERROR: {e}")
             self._json_response(500, {'error': str(e)})
 
+    def _handle_edges(self):
+        """Return FastSAM segmentation outlines as PNG (black edges on transparent bg)."""
+        content_length = int(self.headers.get('Content-Length', 0))
+        if content_length == 0:
+            self._json_response(400, {'error': 'empty body'})
+            return
+
+        jpeg_data = self.rfile.read(content_length)
+        try:
+            frame = _decode_jpeg_with_exif(jpeg_data)
+        except Exception:
+            self._json_response(400, {'error': 'invalid image'})
+            return
+
+        try:
+            t0 = time.perf_counter()
+            h, w = frame.shape[:2]
+
+            results = _fastsam(frame, verbose=False, conf=0.4, iou=0.9)
+            r = results[0]
+
+            rgba = np.zeros((h, w, 4), dtype=np.uint8)
+            seg_count = 0
+            if r.masks is not None:
+                for mask in r.masks.data.cpu().numpy():
+                    mask_resized = cv2.resize(mask, (w, h), interpolation=cv2.INTER_LINEAR)
+                    binary = (mask_resized > 0.5).astype(np.uint8)
+                    contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                    cv2.drawContours(rgba, contours, -1, (0, 0, 0, 255), 3)
+                seg_count = len(r.masks)
+
+            # Gaussian smoothing on the edge map to round out jagged contours
+            alpha = rgba[:, :, 3]
+            alpha = cv2.GaussianBlur(alpha, (21, 21), 0)
+            _, alpha = cv2.threshold(alpha, 80, 255, cv2.THRESH_BINARY)
+            rgba[:, :, 3] = alpha
+
+            _, png_buf = cv2.imencode('.png', rgba)
+            b64 = base64.b64encode(png_buf.tobytes()).decode('utf-8')
+
+            dt = time.perf_counter() - t0
+            print(f"[Edges] {w}x{h} -> {seg_count} segments, {len(b64) // 1024}KB PNG in {dt*1000:.0f}ms")
+            self._json_response(200, {'edge_image': b64, 'width': w, 'height': h})
+        except Exception as e:
+            print(f"[Edges] ERROR: {e}")
+            self._json_response(500, {'error': str(e)})
+
     def _json_response(self, status: int, data: dict):
         body = json.dumps(data).encode('utf-8')
         self.send_response(status)
@@ -275,7 +316,7 @@ class CompositionHandler(BaseHTTPRequestHandler):
 
 
 def main():
-    global _predictor, _detector
+    global _predictor
 
     parser = argparse.ArgumentParser(description="Image assessment HTTP server")
     parser.add_argument("--port", type=int, default=8420, help="Port (default: 8420)")
@@ -296,6 +337,8 @@ def main():
     # Load models
     _predictor = ImagePredictor(TANET_PATH, PLACES365_PATH, samp_checkpoint_path=SAMP_PATH, device=device)
     _detector = ObjectDetector(device=device)
+    _fastsam = FastSAM('FastSAM-s.pt')
+    print(f"[Server] FastSAM-s loaded")
 
     # Start threaded server so health checks don't block during inference
     class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):

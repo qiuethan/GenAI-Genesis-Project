@@ -1,131 +1,110 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
-import type { Detection } from '../../../infra/visionCamera';
-import type { SelectedObject, ScanResult } from '../hooks/useScanMode';
+import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import type { ScanResult } from '../hooks/useScanMode';
 
 interface Props {
-  isSelecting: boolean;
+  isScanMode: boolean;
   isScanning: boolean;
+  isProcessing: boolean;
   hasResult: boolean;
-  selectedObjects: SelectedObject[];
-  detections: Detection[];
-  progress: number;
   result: ScanResult | null;
   error: string | null;
+  frameCount: number;
+  scoredCount: number;
+  countdown: number;
   onStartScan: () => void;
-  onCancel: () => void;
+  onStopScan: () => void;
+  onSaveBest: () => void;
+  onGuideMode: () => void;
+  onDone: () => void;
   cameraFrameTop: number;
   cameraFrameHeight: number;
-  cameraFrameWidth: number;
 }
 
 export const ScanOverlay: React.FC<Props> = ({
-  isSelecting, isScanning, hasResult,
-  selectedObjects, detections,
-  progress, result, error,
-  onStartScan, onCancel,
-  cameraFrameTop, cameraFrameHeight, cameraFrameWidth,
+  isScanMode, isScanning, isProcessing, hasResult,
+  result, error, frameCount, scoredCount, countdown,
+  onStartScan, onStopScan, onSaveBest, onGuideMode, onDone,
+  cameraFrameTop, cameraFrameHeight,
 }) => {
-  const hasSelected = selectedObjects.length > 0;
-  if (!isSelecting && !isScanning && !hasResult && !hasSelected) return null;
-
-  // Match each selected object to its live YOLO detection
-  const trackedBoxes = selectedObjects.map(sel => {
-    const match = detections.find(d =>
-      d.label === sel.label &&
-      Math.abs((d.x1 + d.x2) / 2 - (sel.box_norm[0] + sel.box_norm[2]) / 2) < 0.3
-    );
-    return {
-      ...sel,
-      liveBox: match ? [match.x1, match.y1, match.x2, match.y2] as const : sel.box_norm,
-      isTracked: match != null,
-    };
-  });
+  if (!isScanMode) return null;
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-      {/* Only draw boxes for selected objects — tracked live via YOLO */}
-      {trackedBoxes.map((obj) => {
-        const [nx1, ny1, nx2, ny2] = obj.liveBox;
-        const left = nx1 * cameraFrameWidth;
-        const top = cameraFrameTop + ny1 * cameraFrameHeight;
-        const width = (nx2 - nx1) * cameraFrameWidth;
-        const height = (ny2 - ny1) * cameraFrameHeight;
-
-        return (
-          <View
-            key={obj.id}
-            style={[s.objectBox, {
-              left, top, width, height,
-              borderColor: obj.isTracked ? '#00ff88' : '#ff4444',
-            }]}
-            pointerEvents="none"
-          >
-            <View style={[s.labelBg, {
-              backgroundColor: obj.isTracked ? '#00ff88' : '#ff4444',
-            }]}>
-              <Text style={s.labelText}>{obj.label}</Text>
-            </View>
-          </View>
-        );
-      })}
-
-      {/* Selection mode hint */}
-      {isSelecting && (
-        <View style={[s.hintBar, { top: cameraFrameTop + 10 }]}>
-          <Text style={s.hintText}>
-            {selectedObjects.length === 0
-              ? 'Tap objects to keep in frame'
-              : `${selectedObjects.length} selected`}
-          </Text>
-        </View>
-      )}
-
-      {/* Start scan / cancel buttons */}
-      {isSelecting && selectedObjects.length > 0 && (
-        <View style={[s.buttonRow, { top: cameraFrameTop + cameraFrameHeight - 70 }]}>
-          <TouchableOpacity style={s.cancelBtn} onPress={onCancel}>
-            <Text style={s.cancelText}>Cancel</Text>
-          </TouchableOpacity>
+    <View style={[StyleSheet.absoluteFill, { zIndex: 100 }]} pointerEvents="box-none">
+      {/* Ready state */}
+      {!isScanning && !isProcessing && !hasResult && !error && (
+        <View style={[s.centerRow, { top: cameraFrameTop + cameraFrameHeight - 100 }]}>
           <TouchableOpacity style={s.scanBtn} onPress={onStartScan}>
             <Text style={s.scanText}>Start Scan</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {/* Scanning progress */}
+      {/* Scanning — capturing frames based on tilt */}
       {isScanning && (
-        <View style={[s.hintBar, { top: cameraFrameTop + 10 }]}>
-          <Text style={s.hintText}>Pan slowly...</Text>
-          <View style={s.progressBarBg}>
-            <View style={[s.progressBarFill, { width: `${progress * 100}%` }]} />
-          </View>
-        </View>
-      )}
-
-      {/* Result: ghost overlay */}
-      {hasResult && result && (
         <>
-          <Image
-            source={{ uri: result.bestFrameUri }}
-            style={[s.ghostImage, { top: cameraFrameTop, height: cameraFrameHeight }]}
-            resizeMode="cover"
-          />
-          <View style={[s.hintBar, { top: cameraFrameTop + 10 }]}>
-            <Text style={s.hintText}>Best angle (score: {result.bestScore})</Text>
+          <View style={[s.statusBar, { top: cameraFrameTop + 10 }]}>
+            <View style={s.statusPill}>
+              <Text style={s.statusText}>
+                {countdown}s — Move phone slowly  |  {frameCount} frames
+              </Text>
+            </View>
           </View>
-          <View style={[s.buttonRow, { top: cameraFrameTop + cameraFrameHeight - 70 }]}>
-            <TouchableOpacity style={s.cancelBtn} onPress={onCancel}>
-              <Text style={s.cancelText}>Done</Text>
+
+          <View style={[s.centerRow, { top: cameraFrameTop + cameraFrameHeight - 100 }]}>
+            <TouchableOpacity style={s.stopBtn} onPress={onStopScan}>
+              <Text style={s.stopText}>Done Scanning</Text>
             </TouchableOpacity>
           </View>
         </>
       )}
 
+      {/* Processing — scoring frames */}
+      {isProcessing && (
+        <View style={[s.cardContainer, { top: cameraFrameTop + cameraFrameHeight / 2 - 70 }]}>
+          <View style={s.card}>
+            <ActivityIndicator size="large" color="#00ff88" style={{ marginBottom: 12 }} />
+            <Text style={s.cardTitle}>Finding best composition...</Text>
+            <Text style={s.cardBody}>
+              {scoredCount} / {frameCount} frames scored
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* Result — two options */}
+      {hasResult && result && (
+        <View style={[s.cardContainer, { top: cameraFrameTop + cameraFrameHeight / 2 - 90 }]}>
+          <View style={s.card}>
+            <Text style={s.cardTitle}>Best Score: {result.bestScore}</Text>
+            <Text style={s.cardBody}>Choose what to do with this composition:</Text>
+
+            <TouchableOpacity style={s.optionBtn} onPress={onSaveBest}>
+              <Text style={s.optionTitle}>Save to Gallery</Text>
+              <Text style={s.optionDesc}>Save the best frame with its score</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={s.optionBtn} onPress={onGuideMode}>
+              <Text style={s.optionTitle}>Composition Guide</Text>
+              <Text style={s.optionDesc}>Overlay the best frame to line up your shot</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={s.dismissBtn} onPress={onDone}>
+              <Text style={s.dismissText}>Discard</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       {/* Error */}
       {error && (
-        <View style={[s.hintBar, { top: cameraFrameTop + 50 }]}>
-          <Text style={[s.hintText, { color: '#ff4444' }]}>{error}</Text>
+        <View style={[s.cardContainer, { top: cameraFrameTop + cameraFrameHeight / 2 - 50 }]}>
+          <View style={s.card}>
+            <Text style={[s.cardBody, { color: '#ff4444' }]}>{error}</Text>
+            <TouchableOpacity style={s.dismissBtn} onPress={onDone}>
+              <Text style={s.dismissText}>OK</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
     </View>
@@ -133,72 +112,91 @@ export const ScanOverlay: React.FC<Props> = ({
 };
 
 const s = StyleSheet.create({
-  objectBox: {
-    position: 'absolute',
-    borderWidth: 2,
-    borderRadius: 4,
-  },
-  labelBg: {
-    position: 'absolute',
-    top: -1,
-    left: -1,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderBottomRightRadius: 4,
-  },
-  labelText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: 'black',
-  },
-  hintBar: {
+  centerRow: {
     position: 'absolute',
     left: 0, right: 0,
     alignItems: 'center',
-    zIndex: 50,
   },
-  hintText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  progressBarBg: {
-    width: 200, height: 4,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    borderRadius: 2, marginTop: 8,
-  },
-  progressBarFill: {
-    height: 4,
-    backgroundColor: '#00ff88',
-    borderRadius: 2,
-  },
-  buttonRow: {
+  statusBar: {
     position: 'absolute',
-    left: 0, right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 16, zIndex: 50,
+    left: 20, right: 20,
+    alignItems: 'center',
+  },
+  statusPill: {
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    alignItems: 'center',
+    width: '100%',
+  },
+  statusText: {
+    color: '#00ff88',
+    fontSize: 15,
+    fontWeight: '700',
   },
   scanBtn: {
     backgroundColor: '#00ff88',
-    paddingHorizontal: 24, paddingVertical: 12,
-    borderRadius: 25,
+    paddingHorizontal: 32, paddingVertical: 14,
+    borderRadius: 30,
   },
-  scanText: { color: 'black', fontSize: 16, fontWeight: '700' },
-  cancelBtn: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 24, paddingVertical: 12,
-    borderRadius: 25,
+  scanText: { color: 'black', fontSize: 17, fontWeight: '700' },
+  stopBtn: {
+    backgroundColor: '#ff4444',
+    paddingHorizontal: 32, paddingVertical: 14,
+    borderRadius: 30,
   },
-  cancelText: { color: 'white', fontSize: 16, fontWeight: '600' },
-  ghostImage: {
+  stopText: { color: 'white', fontSize: 17, fontWeight: '700' },
+  cardContainer: {
     position: 'absolute',
-    left: 0, right: 0,
-    opacity: 0.4, zIndex: 40,
+    left: 24, right: 24,
+    alignItems: 'center',
+  },
+  card: {
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    alignItems: 'center',
+    width: '100%',
+  },
+  cardTitle: {
+    color: '#00ff88',
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  cardBody: {
+    color: '#ccc',
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  optionBtn: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    width: '100%',
+    marginBottom: 10,
+  },
+  optionTitle: {
+    color: 'white',
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  optionDesc: {
+    color: '#999',
+    fontSize: 12,
+  },
+  dismissBtn: {
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  dismissText: {
+    color: '#888',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

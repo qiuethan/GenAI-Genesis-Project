@@ -102,7 +102,7 @@ export const ImageViewerScreen = () => {
       <Image
         source={{ uri: item }}
         style={styles.image}
-        resizeMode="contain"
+        contentFit="contain"
       />
     </View>
   );
