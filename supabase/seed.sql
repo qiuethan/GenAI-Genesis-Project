@@ -62,7 +62,7 @@ DECLARE
     {"id": "b0000000-0000-0000-0000-000000000004", "email": "dana@frame.test",    "username": "dana_captures",  "display_name": "Dana Rivera"},
     {"id": "b0000000-0000-0000-0000-000000000005", "email": "emma@frame.test",    "username": "emma_lens",      "display_name": "Emma Liu"},
     {"id": "b0000000-0000-0000-0000-000000000006", "email": "frank@frame.test",   "username": "frank_focus",    "display_name": "Frank Kim"},
-    {"id": "b0000000-0000-0000-0000-000000000007", "email": "isaac@frame.test",   "username": "isaac_peciov",   "display_name": "Isaac Peciov"},
+    {"id": "b0000000-0000-0000-0000-000000000007", "email": "isaac@frame.test",   "username": "isaac_picov",   "display_name": "Isaac Picov"},
     {"id": "b0000000-0000-0000-0000-000000000008", "email": "jessica@frame.test", "username": "jessica_chen",   "display_name": "Jessica Chen"}
   ]';
   _u jsonb;
@@ -152,7 +152,7 @@ UPDATE public.user_profiles SET
 WHERE id = 'b0000000-0000-0000-0000-000000000006';
 
 UPDATE public.user_profiles SET
-  display_name = 'Isaac Peciov',
+  display_name = 'Isaac Picov',
   bio = 'Cars, temples, and everything between. Fujifilm shooter.',
   avatar_url = 'https://i.pravatar.cc/200?img=68',
   composition_badge = 'Vanishing Point',
@@ -388,72 +388,72 @@ INSERT INTO public.submissions (
   -- Reflections (symmetric) — Lucerne church mirrored in water
   ('a0000000-0000-0000-0000-000000000008',
    'b0000000-0000-0000-0000-000000000008',
-   'https://xwtrkqzkwgxbluprpjur.supabase.co/storage/v1/object/public/submissions/jessica/AP1GczMAExcgtxEUbxPdT2JrG9MoX6fbTGQ5OpojKwALNARKg22nRmfx1xiVw2250-h1688-s-no.png',
-   'jessica/AP1GczMAExcgtxEUbxPdT2JrG9MoX6fbTGQ5OpojKwALNARKg22nRmfx1xiVw2250-h1688-s-no.png',
+   'https://xwtrkqzkwgxbluprpjur.supabase.co/storage/v1/object/public/submissions/Jessica/AP1GczMAExcgtxEUbxPdT2JrG9MoX6fbTGQ5OpojKwALNARKg22nRmfx1xiVw2250-h1688-s-no.png',
+   'Jessica/AP1GczMAExcgtxEUbxPdT2JrG9MoX6fbTGQ5OpojKwALNARKg22nRmfx1xiVw2250-h1688-s-no.png',
    'Lucerne at rest — the river holds the church twice',
    'symmetric', 0.92, NULL, now() - interval '11 days'),
 
   -- Sunbursts (radial) — Aurora borealis through branches
   ('a0000000-0000-0000-0000-000000000012',
    'b0000000-0000-0000-0000-000000000008',
-   'https://xwtrkqzkwgxbluprpjur.supabase.co/storage/v1/object/public/submissions/jessica/AP1GczMnzrJ-4UMOFYeegxUJuHhIyb34-B_W2-nDqKnbtjETRu7Mi1BR8aTTw1266-h1688-s-no.png',
-   'jessica/AP1GczMnzrJ-4UMOFYeegxUJuHhIyb34-B_W2-nDqKnbtjETRu7Mi1BR8aTTw1266-h1688-s-no.png',
+   'https://xwtrkqzkwgxbluprpjur.supabase.co/storage/v1/object/public/submissions/Jessica/AP1GczMnzrJ-4UMOFYeegxUJuHhIyb34-B_W2-nDqKnbtjETRu7Mi1BR8aTTw1266-h1688-s-no.png',
+   'Jessica/AP1GczMnzrJ-4UMOFYeegxUJuHhIyb34-B_W2-nDqKnbtjETRu7Mi1BR8aTTw1266-h1688-s-no.png',
    'Northern lights painting through the apple blossoms',
    'radial', 0.94, NULL, now() - interval '21 days'),
 
   -- Paths & Tunnels (vanishing_point) — Swiss highway into mountains
   ('a0000000-0000-0000-0000-000000000005',
    'b0000000-0000-0000-0000-000000000008',
-   'https://xwtrkqzkwgxbluprpjur.supabase.co/storage/v1/object/public/submissions/jessica/AP1GczOrB9Qettd3kuHb8t6T6Q-iRlJnNtfEmruYMyKpAzPZwvcG1V-T_dojw2250-h1688-s-no.png',
-   'jessica/AP1GczOrB9Qettd3kuHb8t6T6Q-iRlJnNtfEmruYMyKpAzPZwvcG1V-T_dojw2250-h1688-s-no.png',
+   'https://xwtrkqzkwgxbluprpjur.supabase.co/storage/v1/object/public/submissions/Jessica/AP1GczOrB9Qettd3kuHb8t6T6Q-iRlJnNtfEmruYMyKpAzPZwvcG1V-T_dojw2250-h1688-s-no.png',
+   'Jessica/AP1GczOrB9Qettd3kuHb8t6T6Q-iRlJnNtfEmruYMyKpAzPZwvcG1V-T_dojw2250-h1688-s-no.png',
    'The autobahn dissolves into the Alps',
    'vanishing_point', 0.91, NULL, now() - interval '7 days'),
 
   -- Macro World (fill_the_frame) — Bokeh lantern close-up
   ('a0000000-0000-0000-0000-000000000009',
    'b0000000-0000-0000-0000-000000000008',
-   'https://xwtrkqzkwgxbluprpjur.supabase.co/storage/v1/object/public/submissions/jessica/AP1GczNjCUmj3aj70XapDRaX8zqf4x6tTWjbv6x8gESGWKTcEFnM4zL61k03w1266-h1688-s-no.png',
-   'jessica/AP1GczNjCUmj3aj70XapDRaX8zqf4x6tTWjbv6x8gESGWKTcEFnM4zL61k03w1266-h1688-s-no.png',
+   'https://xwtrkqzkwgxbluprpjur.supabase.co/storage/v1/object/public/submissions/Jessica/AP1GczNjCUmj3aj70XapDRaX8zqf4x6tTWjbv6x8gESGWKTcEFnM4zL61k03w1266-h1688-s-no.png',
+   'Jessica/AP1GczNjCUmj3aj70XapDRaX8zqf4x6tTWjbv6x8gESGWKTcEFnM4zL61k03w1266-h1688-s-no.png',
    'One bulb, a thousand bokeh companions',
    'fill_the_frame', 0.88, NULL, now() - interval '15 days'),
 
   -- Calm Waters (golden_ratio) — Swiss alpine village panorama
   ('a0000000-0000-0000-0000-000000000010',
    'b0000000-0000-0000-0000-000000000008',
-   'https://xwtrkqzkwgxbluprpjur.supabase.co/storage/v1/object/public/submissions/jessica/AP1GczOY1TbWav8-GIFOaYziTy7sFOJSw5pzUd6GI9HpG1_o5AZkDSPUQ1ryw2992-h1684-s-no.png',
-   'jessica/AP1GczOY1TbWav8-GIFOaYziTy7sFOJSw5pzUd6GI9HpG1_o5AZkDSPUQ1ryw2992-h1684-s-no.png',
+   'https://xwtrkqzkwgxbluprpjur.supabase.co/storage/v1/object/public/submissions/Jessica/AP1GczOY1TbWav8-GIFOaYziTy7sFOJSw5pzUd6GI9HpG1_o5AZkDSPUQ1ryw2992-h1684-s-no.png',
+   'Jessica/AP1GczOY1TbWav8-GIFOaYziTy7sFOJSw5pzUd6GI9HpG1_o5AZkDSPUQ1ryw2992-h1684-s-no.png',
    'The valley keeps its secrets in green and white',
    'golden_ratio', 0.90, NULL, now() - interval '17 days'),
 
   -- Winding Roads (curved) — Frozen waterfall canyon
   ('a0000000-0000-0000-0000-000000000004',
    'b0000000-0000-0000-0000-000000000008',
-   'https://xwtrkqzkwgxbluprpjur.supabase.co/storage/v1/object/public/submissions/jessica/AP1GczOYh8GY9fj6UWsTjcGgZSOI3dVpl-A_pFaufW9w03AzdxmNg-srvhs4w1266-h1688-s-no.png',
-   'jessica/AP1GczOYh8GY9fj6UWsTjcGgZSOI3dVpl-A_pFaufW9w03AzdxmNg-srvhs4w1266-h1688-s-no.png',
+   'https://xwtrkqzkwgxbluprpjur.supabase.co/storage/v1/object/public/submissions/Jessica/AP1GczOYh8GY9fj6UWsTjcGgZSOI3dVpl-A_pFaufW9w03AzdxmNg-srvhs4w1266-h1688-s-no.png',
+   'Jessica/AP1GczOYh8GY9fj6UWsTjcGgZSOI3dVpl-A_pFaufW9w03AzdxmNg-srvhs4w1266-h1688-s-no.png',
    'Ice carved its own winding path through the canyon',
    'curved', 0.93, NULL, now() - interval '9 days'),
 
   -- Golden Hour Landscapes (rule_of_thirds) — Chinese dancer on stage
   ('a0000000-0000-0000-0000-000000000006',
    'b0000000-0000-0000-0000-000000000008',
-   'https://xwtrkqzkwgxbluprpjur.supabase.co/storage/v1/object/public/submissions/jessica/AP1GczPG8WxyBg0yFNPPHzv_NqiW6Q_OS9K_bQrqb3sNxeoagTo6whLwfjxFw2532-h1688-s-no.png',
-   'jessica/AP1GczPG8WxyBg0yFNPPHzv_NqiW6Q_OS9K_bQrqb3sNxeoagTo6whLwfjxFw2532-h1688-s-no.png',
+   'https://xwtrkqzkwgxbluprpjur.supabase.co/storage/v1/object/public/submissions/Jessica/AP1GczPG8WxyBg0yFNPPHzv_NqiW6Q_OS9K_bQrqb3sNxeoagTo6whLwfjxFw2532-h1688-s-no.png',
+   'Jessica/AP1GczPG8WxyBg0yFNPPHzv_NqiW6Q_OS9K_bQrqb3sNxeoagTo6whLwfjxFw2532-h1688-s-no.png',
    'Silk catching the spotlight — one breath, one frame',
    'rule_of_thirds', 0.89, NULL, now() - interval '5 days'),
 
   -- Wildlife Portraits (center) — Self-portrait through glass
   ('a0000000-0000-0000-0000-000000000002',
    'b0000000-0000-0000-0000-000000000008',
-   'https://xwtrkqzkwgxbluprpjur.supabase.co/storage/v1/object/public/submissions/jessica/AP1GczPKpNgX3YSagIj8JHYihzfwjlPUxTCS23q5GVw6kypE1ZYC6mSYqsSizww2532-h1688-s-no.png',
-   'jessica/AP1GczPKpNgX3YSagIj8JHYihzfwjlPUxTCS23q5GVw6kypE1ZYC6mSYqsSizww2532-h1688-s-no.png',
+   'https://xwtrkqzkwgxbluprpjur.supabase.co/storage/v1/object/public/submissions/Jessica/AP1GczPKpNgX3YSagIj8JHYihzfwjlPUxTCS23q5GVw6kypE1ZYC6mSYqsSizww2532-h1688-s-no.png',
+   'Jessica/AP1GczPKpNgX3YSagIj8JHYihzfwjlPUxTCS23q5GVw6kypE1ZYC6mSYqsSizww2532-h1688-s-no.png',
    'Ghost in the glass — hat, camera, city',
    'center', 0.82, NULL, now() - interval '8 hours'),
 
   -- Urban Rush (diagonal) — Bern cobblestone street with flags
   ('a0000000-0000-0000-0000-000000000001',
    'b0000000-0000-0000-0000-000000000008',
-   'https://xwtrkqzkwgxbluprpjur.supabase.co/storage/v1/object/public/submissions/jessica/AP1GczPm9UeD04E2n_CVJQpAUOLFmmx1jOqn6-DlVreBTTPp3S77qDu7wfwwcQw2532-h1688-s-no.png',
-   'jessica/AP1GczPm9UeD04E2n_CVJQpAUOLFmmx1jOqn6-DlVreBTTPp3S77qDu7wfwwcQw2532-h1688-s-no.png',
+   'https://xwtrkqzkwgxbluprpjur.supabase.co/storage/v1/object/public/submissions/Jessica/AP1GczPm9UeD04E2n_CVJQpAUOLFmmx1jOqn6-DlVreBTTPp3S77qDu7wfwwcQw2532-h1688-s-no.png',
+   'Jessica/AP1GczPm9UeD04E2n_CVJQpAUOLFmmx1jOqn6-DlVreBTTPp3S77qDu7wfwwcQw2532-h1688-s-no.png',
    'Cobblestones and Swiss flags — Bern from ground level',
    'diagonal', 0.86, NULL, now() - interval '15 hours');
 
