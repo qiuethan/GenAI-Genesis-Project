@@ -22,41 +22,49 @@ export const galleryStyles = StyleSheet.create({
     paddingBottom: 40,
   },
 
-  // Header
-  header: {
+  // Sticky Header
+  headerContainer: {
+    backgroundColor: '#0a0f1a',
+    paddingHorizontal: SECTION_PADDING,
+    paddingBottom: 6,
+    zIndex: 10,
+  },
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: SECTION_PADDING,
-    paddingBottom: 20,
+    height: 44,
+  },
+  headerIconButton: {
+    width: 40,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#1a2030',
   },
   avatarFallback: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#1a2535',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarFallbackText: {
     color: 'white',
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '700',
   },
   headerTitle: {
     flex: 1,
     color: 'white',
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
-  },
-  headerSpacer: {
-    width: 48,
   },
 
   // Section header
@@ -70,7 +78,7 @@ export const galleryStyles = StyleSheet.create({
   },
   sectionTitle: {
     color: 'white',
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: '700',
   },
   seeAllText: {

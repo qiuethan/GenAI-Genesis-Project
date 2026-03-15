@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useGallery } from '../hooks';
-import { useAlbums, createAlbum } from '../hooks/useAlbums';
+import { useAlbums, createAlbum, deleteAlbum } from '../hooks/useAlbums';
 import { useAuth } from '../../auth/context/AuthContext';
 import { useUserProfile } from '../../../shared/hooks/useProfile';
 import { PhotoAsset } from '../../../infra/mediaLibrary';
@@ -105,6 +105,24 @@ export const GalleryScreen = () => {
     });
   };
 
+  const handleDeleteAlbum = (album: DisplayAlbum) => {
+    if (album.id === '__all__') return;
+    Alert.alert(
+      'Delete Album',
+      `Delete "${album.name}"? Photos won't be deleted from your device.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteAlbum(album.id);
+          },
+        },
+      ],
+    );
+  };
+
   const handleCreateAlbum = () => {
     Alert.prompt(
       'New Album',
@@ -135,19 +153,17 @@ export const GalleryScreen = () => {
 
   return (
     <View style={styles.container}>
-      <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          {
-            paddingTop: insets.top + 16,
-            paddingBottom: insets.bottom + 20,
-          },
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header with avatar and title */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => (navigation as any).navigate('ProfileTab')}>
+      {/* Sticky Header */}
+      <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
+        <View style={styles.headerRow}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerIconButton}>
+            <Ionicons name="chevron-back" size={24} color="white" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Gallery</Text>
+          <TouchableOpacity
+            onPress={() => (navigation as any).navigate('ProfileTab')}
+            style={styles.headerIconButton}
+          >
             {profile?.avatar_url ? (
               <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
             ) : (
@@ -158,9 +174,18 @@ export const GalleryScreen = () => {
               </View>
             )}
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Gallery</Text>
-          <View style={styles.headerSpacer} />
         </View>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingBottom: insets.bottom + 20,
+          },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
 
         {/* My Albums */}
         <View style={styles.sectionHeader}>
@@ -179,6 +204,7 @@ export const GalleryScreen = () => {
             <TouchableOpacity
               style={styles.albumCard}
               onPress={() => handleAlbumPress(item)}
+              onLongPress={() => handleDeleteAlbum(item)}
               activeOpacity={0.8}
             >
               {item.coverUri ? (

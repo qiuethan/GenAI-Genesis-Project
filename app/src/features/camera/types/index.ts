@@ -37,6 +37,7 @@ export interface ImageViewerParams {
   allPhotos?: string[];
   allPhotoIds?: string[];
   initialIndex?: number;
+  albumId?: string;
 }
 
 // Navigation param list for type-safe navigation
