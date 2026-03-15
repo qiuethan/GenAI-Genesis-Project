@@ -7,8 +7,15 @@ import { AspectRatio } from '../types';
 import { getServerUrl } from '../../../infra/network/serverUrl';
 
 export interface CompositionResult {
-  score: number;
+  aesthetic_score: number;
+  score?: number; // backward compat alias for aesthetic_score
   inference_ms: number;
+  composition_score?: number;
+  distribution?: number[];
+  pattern_weights?: number[];
+  dominant_pattern?: number;
+  dominant_pattern_name?: string;
+  attributes?: Record<string, number>;
 }
 
 export interface UseCompositionScoreConfig {

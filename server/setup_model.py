@@ -18,10 +18,6 @@ PLACES365_URL = "https://github.com/woshidandan/TANet-image-aesthetics-and-quali
 SAMP_URL = "https://www.dropbox.com/scl/fi/k1yuyhotuk9ky3m41iobg/samp_net.pth?rlkey=aoqqxv27wd5qqj3pytxki6vi3&st=0ffubx5d&dl=1"
 SAMP_PATH = os.path.join(MODEL_DIR, "samp_net.pth")
 
-# NIMA VGG16 (aesthetic) — from pyiqa on Hugging Face
-NIMA_PATH = os.path.join(MODEL_DIR, "nima_vgg16_ava.pth")
-MODEL_PATH = SAMP_PATH  # backward compat
-
 
 def _progress(block_num, block_size, total_size):
     downloaded = block_num * block_size
@@ -110,10 +106,10 @@ def download_model(force=False):
     download_nima(force)
 
 
+
 if __name__ == "__main__":
     force = "--force" in sys.argv
     download_tanet(force)
     download_places365(force)
     download_samp(force)
-    download_nima(force)
     print("\nAll models ready.")

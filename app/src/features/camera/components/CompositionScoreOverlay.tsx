@@ -11,36 +11,11 @@ interface Props {
 }
 
 const scoreToColor = (score: number): string => {
-  // score is 0-100
   const t = Math.max(0, Math.min(1, score / 100));
   if (t < 0.25) return '#ff4444';
   if (t < 0.5) return '#ff9900';
   if (t < 0.75) return '#aacc00';
   return '#44cc44';
-};
-
-const DistributionBar: React.FC<{ distribution: number[] }> = ({ distribution }) => {
-  const maxVal = Math.max(...distribution, 0.01);
-  const barColors = ['#ff4444', '#ff9900', '#dddd00', '#aacc00', '#44cc44'];
-
-  return (
-    <View style={barStyles.container}>
-      {distribution.map((val, i) => (
-        <View key={i} style={barStyles.barWrapper}>
-          <View
-            style={[
-              barStyles.bar,
-              {
-                height: Math.max(2, (val / maxVal) * 20),
-                backgroundColor: barColors[i],
-              },
-            ]}
-          />
-          <Text style={barStyles.label}>{i + 1}</Text>
-        </View>
-      ))}
-    </View>
-  );
 };
 
 export const CompositionScoreOverlay: React.FC<Props> = ({
@@ -53,7 +28,6 @@ export const CompositionScoreOverlay: React.FC<Props> = ({
   const hasShown = useRef(false);
 
   useEffect(() => {
-    // Only animate on first appearance, not on every score update
     if (result && !hasShown.current) {
       hasShown.current = true;
       Animated.timing(fadeAnim, {
@@ -66,7 +40,11 @@ export const CompositionScoreOverlay: React.FC<Props> = ({
 
   if (!result && !connected) return null;
 
-  const color = result ? scoreToColor(result.score) : '#888';
+  const aestheticScore = result ? (result.aesthetic_score ?? result.score ?? 0) : 0;
+  const aestheticColor = result ? scoreToColor(aestheticScore) : '#888';
+  const compositionColor = result?.composition_score != null
+    ? scoreToColor(result.composition_score)
+    : '#888';
 
   return (
     <View
@@ -78,12 +56,30 @@ export const CompositionScoreOverlay: React.FC<Props> = ({
           <View style={styles.pill}>
             {result ? (
               <View style={styles.content}>
-                {/* Score */}
-                <View style={styles.scoreSection}>
-                  <Text style={[styles.score, { color }]}>
-                    {Math.round(result.score)}
+                {/* Aesthetic score (TANet) */}
+                <View style={styles.scoreRow}>
+                  <Text style={styles.icon}>👁</Text>
+                  <Text style={[styles.score, { color: aestheticColor }]}>
+                    {Math.round(aestheticScore)}
                   </Text>
                 </View>
+
+                {/* Composition score (SAMP-Net) */}
+                {result.composition_score != null && (
+                  <View style={styles.scoreRow}>
+                    <Text style={styles.icon}>📐</Text>
+                    <Text style={[styles.score, { color: compositionColor }]}>
+                      {Math.round(result.composition_score)}
+                    </Text>
+                  </View>
+                )}
+
+                {/* Dominant pattern name */}
+                {result.dominant_pattern_name && (
+                  <Text style={styles.patternName}>
+                    {result.dominant_pattern_name}
+                  </Text>
+                )}
 
                 {/* Inference time */}
                 <Text style={styles.timing}>
@@ -116,34 +112,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
-  scoreSection: {
+  scoreRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
+  },
+  icon: {
+    fontSize: 14,
   },
   score: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
   },
-  label: {
-    fontSize: 10,
+  patternName: {
+    fontSize: 9,
+    color: '#aaa',
     fontWeight: '600',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-  suggestion: {
-    fontSize: 11,
-    color: '#ffcc00',
-    fontWeight: '600',
-    textAlign: 'center',
-    marginTop: 4,
-    maxWidth: 110,
-  },
-  tip: {
-    fontSize: 10,
-    color: '#ffcc00',
     textAlign: 'center',
     marginTop: 2,
-    maxWidth: 100,
   },
   timing: {
     fontSize: 9,
@@ -153,28 +140,5 @@ const styles = StyleSheet.create({
   connecting: {
     fontSize: 11,
     color: '#888',
-  },
-});
-
-const barStyles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 2,
-    height: 28,
-    marginTop: 2,
-  },
-  barWrapper: {
-    alignItems: 'center',
-    width: 10,
-  },
-  bar: {
-    width: 8,
-    borderRadius: 2,
-  },
-  label: {
-    fontSize: 7,
-    color: '#666',
-    marginTop: 1,
   },
 });
