@@ -64,6 +64,8 @@ class CompositionHandler(BaseHTTPRequestHandler):
             return self._handle_scan()
         if self.path == '/analyze-composition':
             return self._handle_analyze_composition()
+        if self.path == '/analyze-interactive':
+            return self._handle_analyze_interactive()
         if self.path != '/analyze':
             self._json_response(404, {'error': 'not found'})
             return
@@ -193,6 +195,58 @@ class CompositionHandler(BaseHTTPRequestHandler):
             self._json_response(200, response_data)
         except Exception as e:
             print(f"[AnalyzeComp] ERROR: {e}")
+            self._json_response(500, {'error': str(e)})
+
+    def _handle_analyze_interactive(self):
+        """Run SAMP-Net + Gemini to produce structured composition analysis JSON."""
+        content_length = int(self.headers.get('Content-Length', 0))
+        if content_length == 0:
+            self._json_response(400, {'error': 'empty body'})
+            return
+
+        jpeg_data = self.rfile.read(content_length)
+        try:
+            frame = _decode_jpeg_with_exif(jpeg_data)
+        except Exception:
+            self._json_response(400, {'error': 'invalid image'})
+            return
+
+        try:
+            from .inference.gemini import analyze_interactive
+
+            # Run SAMP-Net for composition context
+            t0 = time.perf_counter()
+            result = _predictor.predict(frame)
+            dt_model = time.perf_counter() - t0
+
+            composition_type = result.get('dominant_pattern_name', 'Rule of Thirds')
+
+            # Re-encode frame as JPEG for Gemini
+            _, jpeg_buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
+            image_bytes = jpeg_buf.tobytes()
+
+            # Call Gemini for structured analysis
+            t1 = time.perf_counter()
+            analysis = analyze_interactive(image_bytes, composition_type, result)
+            dt_gemini = time.perf_counter() - t1
+
+            if analysis is None:
+                self._json_response(500, {'error': 'Gemini returned no analysis'})
+                return
+
+            response_data = {
+                'analysis': analysis,
+                'composition_type': composition_type,
+                'aesthetic_score': result.get('aesthetic_score'),
+                'composition_score': result.get('composition_score'),
+                'attributes': result.get('attributes', {}),
+                'model_ms': round(dt_model * 1000, 1),
+                'gemini_ms': round(dt_gemini * 1000, 1),
+            }
+            print(f"[AnalyzeInteractive] {composition_type} | model={dt_model*1000:.0f}ms gemini={dt_gemini*1000:.0f}ms")
+            self._json_response(200, response_data)
+        except Exception as e:
+            print(f"[AnalyzeInteractive] ERROR: {e}")
             self._json_response(500, {'error': str(e)})
 
     def _handle_score(self):

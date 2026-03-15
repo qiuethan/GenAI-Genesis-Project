@@ -28,6 +28,8 @@ export const galleryStyles = StyleSheet.create({
     paddingHorizontal: SECTION_PADDING,
     paddingBottom: 6,
     zIndex: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 170, 0, 0.15)',
   },
   headerRow: {
     flexDirection: 'row',
@@ -77,7 +79,7 @@ export const galleryStyles = StyleSheet.create({
     marginTop: 8,
   },
   sectionTitle: {
-    color: 'white',
+    color: '#ffaa00',
     fontSize: 16,
     fontWeight: '700',
   },
@@ -130,15 +132,15 @@ export const galleryStyles = StyleSheet.create({
     position: 'absolute',
     top: 10,
     right: 10,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: '#ffaa00',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 10,
   },
   albumCountText: {
-    color: 'white',
+    color: '#1a1000',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 
   // Category cards
@@ -192,6 +194,8 @@ export const galleryStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 170, 0, 0.3)',
   },
   utilityLabel: {
     flex: 1,
