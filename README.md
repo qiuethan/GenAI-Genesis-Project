@@ -172,4 +172,4 @@ supabase db reset --linked              # reset remote DB + run migrations + see
 
 ## Team
 
-Built at GenAI Genesis 2025.
+Built at GenAI Genesis 2026.
