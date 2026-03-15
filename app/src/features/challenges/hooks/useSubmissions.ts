@@ -86,6 +86,14 @@ export function useChallengeSubmissions(challengeId: string | undefined, current
       }
     }
 
+    // Sort by score descending (highest first), unscored submissions last
+    mapped.sort((a, b) => {
+      if (a.score != null && b.score != null) return b.score - a.score;
+      if (a.score != null) return -1;
+      if (b.score != null) return 1;
+      return 0;
+    });
+
     setSubmissions(mapped);
     setLoading(false);
   }, [challengeId, currentUserId]);

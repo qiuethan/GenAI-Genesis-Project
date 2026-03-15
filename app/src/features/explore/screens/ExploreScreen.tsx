@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -20,12 +20,19 @@ export function ExploreScreen() {
   const { user } = useAuth();
   const navigation = useNavigation<ExploreScreenNavigationProp>();
   const { submissions, loading, refetch } = useGlobalFeed(50, user?.id);
+  const [refreshing, setRefreshing] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       refetch();
     }, [refetch])
   );
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
   const renderEmpty = useCallback(() => {
     if (loading) return <FeedSkeleton count={3} />;
@@ -62,8 +69,8 @@ export function ExploreScreen() {
         ListEmptyComponent={renderEmpty}
         refreshControl={
           <RefreshControl
-            refreshing={loading}
-            onRefresh={refetch}
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
             tintColor="#fff"
           />
         }

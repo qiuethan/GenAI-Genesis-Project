@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -45,6 +46,11 @@ export function SignInScreen({ navigation }: Props) {
         style={styles.content}
       >
         <View style={styles.header}>
+          <Image
+            source={require('../../../../assets/icon_transparent.png')}
+            style={styles.logo}
+            contentFit="contain"
+          />
           <Text style={styles.title}>Frame</Text>
           <Text style={styles.subtitle}>Composition is the game.</Text>
         </View>
@@ -109,6 +115,11 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: 48,
+  },
+  logo: {
+    width: 100,
+    height: 100,
+    marginBottom: 16,
   },
   title: {
     fontSize: 42,

@@ -68,13 +68,6 @@
           "motionPermission": "Allow $(PRODUCT_NAME) to access your device motion."
         }
       ],
-      [
-        "./plugins/withCoreMLModel",
-        {
-          "modelPath": "yolo11s.mlmodelc",
-          "nativeSourcesDir": "plugins/native-sources"
-        }
-      ]
     ],
     "extra": {
       "eas": {

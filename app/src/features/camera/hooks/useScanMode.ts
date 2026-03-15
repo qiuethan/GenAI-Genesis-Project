@@ -5,11 +5,13 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { CameraHandle } from '../../../infra/visionCamera';
 import { getServerUrl } from '../../../infra/network/serverUrl';
 import { saveToLibrary } from '../../../infra/mediaLibrary/saveToLibrary';
-import { cacheScore } from './useGalleryScores';
+import { scorePhoto } from './useGalleryScores';
 
 export interface ScanResult {
   bestScore: number;
   bestFrameUri: string;
+  compositionScore?: number;
+  compositionType?: string;
 }
 
 const SCAN_DURATION_MS = 6000;
@@ -214,9 +216,9 @@ export const useScanMode = (
     setIsProcessing(true);
     setScoredCount(0);
 
-    const scored: { uri: string; score: number }[] = [];
+    const scored: { uri: string; score: number; compositionScore?: number; compositionType?: string }[] = [];
 
-    const scoreFrame = async (uri: string): Promise<{ uri: string; score: number } | null> => {
+    const scoreFrame = async (uri: string): Promise<typeof scored[number] | null> => {
       try {
         const processed = await ImageManipulator.manipulateAsync(
           uri, [{ resize: { width: 320 } }],
@@ -233,15 +235,18 @@ export const useScanMode = (
 
         const score = data.aesthetic_score ?? data.score ?? 0;
 
-        // Object tracking is done on-device — we just need to know if they're still visible
-        // The checkObjectsInFrame function is called from the component with live detections
         capturedFrames.current.push({
           uri,
           score,
-          valid: true, // will be updated by component via markLastFrameValid
+          valid: true,
         });
 
-        return { uri, score };
+        return {
+          uri,
+          score,
+          compositionScore: data.composition_score,
+          compositionType: data.composition_type,
+        };
       } catch {
         return null;
       }
@@ -269,7 +274,13 @@ export const useScanMode = (
       }
     }
 
-    setResult({ bestScore, bestFrameUri: scored[bestIndex].uri });
+    const best = scored[bestIndex];
+    setResult({
+      bestScore,
+      bestFrameUri: best.uri,
+      compositionScore: best.compositionScore,
+      compositionType: best.compositionType,
+    });
     setHasResult(true);
 
     // Pre-fetch edge-detected version while user reads result card
@@ -358,7 +369,8 @@ export const useScanMode = (
       }
 
       const asset = await saveToLibrary(finalUri);
-      await cacheScore(asset.id, result.bestScore);
+      // Score the saved photo to get full data (aesthetic, composition, type, combined)
+      await scorePhoto(asset.id, asset.uri);
     } catch {}
     setHasResult(false);
     setResult(null);

@@ -46,11 +46,20 @@ export type ExploreStackParamList = {
 export type CameraStackParamList = {
   Camera: undefined;
   Gallery: undefined;
+  AlbumDetail: {
+    albumId: string;
+    albumName: string;
+    compositionType?: string;
+  };
+  PhotoPicker: {
+    albumId: string;
+  };
   ImageViewer: {
     imageUri: string;
     allPhotos?: string[];
     allPhotoIds?: string[];
     initialIndex?: number;
+    albumId?: string;
   };
   SubmitPhoto: {
     challengeId: string;

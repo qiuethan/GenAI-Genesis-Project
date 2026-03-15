@@ -74,13 +74,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         cameraPermission: 'Allow $(PRODUCT_NAME) to take photos for challenges.',
       },
     ],
-    [
-      './plugins/withCoreMLModel',
-      {
-        modelPath: 'yolo11s.mlmodelc',
-        nativeSourcesDir: 'plugins/native-sources',
-      },
-    ],
   ],
   extra: {
     eas: {
