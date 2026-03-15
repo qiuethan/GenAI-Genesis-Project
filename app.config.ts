@@ -1,0 +1,92 @@
+import 'dotenv/config';
+import { ExpoConfig, ConfigContext } from 'expo/config';
+
+export default ({ config }: ConfigContext): ExpoConfig => ({
+  ...config,
+  name: 'Frame',
+  slug: 'Frame',
+  version: '1.0.0',
+  orientation: 'portrait',
+  icon: './app/assets/icon.png',
+  userInterfaceStyle: 'light',
+  newArchEnabled: true,
+  splash: {
+    image: './app/assets/splash-icon.png',
+    resizeMode: 'contain',
+    backgroundColor: '#ffffff',
+  },
+  ios: {
+    infoPlist: {
+      NSCameraUsageDescription: 'We use the camera to take photos.',
+      NSPhotoLibraryAddUsageDescription: 'We save photos to your library.',
+      ITSAppUsesNonExemptEncryption: false,
+    },
+    supportsTablet: true,
+    bundleIdentifier: 'com.ethanqiu.Frame',
+  },
+  android: {
+    adaptiveIcon: {
+      foregroundImage: './app/assets/adaptive-icon.png',
+      backgroundColor: '#ffffff',
+    },
+    edgeToEdgeEnabled: true,
+    permissions: ['CAMERA', 'READ_MEDIA_IMAGES', 'WRITE_EXTERNAL_STORAGE'],
+    predictiveBackGestureEnabled: false,
+    package: 'com.anonymous.Frame',
+  },
+  web: {
+    favicon: './app/assets/favicon.png',
+  },
+  plugins: [
+    [
+      'expo-build-properties',
+      {
+        ios: {
+          useFrameworks: 'static',
+          deploymentTarget: '16.0',
+        },
+      },
+    ],
+    [
+      'expo-media-library',
+      {
+        photosPermission: 'Allow $(PRODUCT_NAME) to access your photos.',
+        savePhotosPermission: 'Allow $(PRODUCT_NAME) to save photos.',
+        isAccessMediaLocationEnabled: true,
+      },
+    ],
+    [
+      'react-native-vision-camera',
+      {
+        cameraPermissionText: '$(PRODUCT_NAME) needs access to your Camera.',
+      },
+    ],
+    [
+      'expo-sensors',
+      {
+        motionPermission: 'Allow $(PRODUCT_NAME) to access your device motion.',
+      },
+    ],
+    [
+      'expo-image-picker',
+      {
+        photosPermission: 'Allow $(PRODUCT_NAME) to access your photos to submit to challenges.',
+        cameraPermission: 'Allow $(PRODUCT_NAME) to take photos for challenges.',
+      },
+    ],
+    [
+      './plugins/withCoreMLModel',
+      {
+        modelPath: 'yolo11s.mlmodelc',
+        nativeSourcesDir: 'plugins/native-sources',
+      },
+    ],
+  ],
+  extra: {
+    eas: {
+      projectId: '3938826d-b84f-4e6e-8f52-fb157d9d7e5b',
+    },
+    supabaseUrl: process.env.SUPABASE_URL,
+    supabaseAnonKey: process.env.SUPABASE_PUBLISHABLE_KEY,
+  },
+});
