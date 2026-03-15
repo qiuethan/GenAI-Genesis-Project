@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import { Image as RNImage } from 'react-native';
 import { DeviceMotion } from 'expo-sensors';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { CameraHandle } from '../../../infra/visionCamera';
@@ -16,6 +17,7 @@ const TILT_THRESHOLD_DEG = 0.5;
 
 export const useScanMode = (
   cameraRef: React.RefObject<CameraHandle | null>,
+  aspectRatio: '4:3' | '16:9' | '1:1' = '4:3',
 ) => {
   const [isScanMode, setIsScanMode] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
@@ -29,6 +31,7 @@ export const useScanMode = (
   // Guide overlay state
   const [guideUri, setGuideUri] = useState<string | null>(null);
   const [guideVisible, setGuideVisible] = useState(false);
+  const [edgeGuideUri, setEdgeGuideUri] = useState<string | null>(null);
 
   const baseUrl = useMemo(() => getServerUrl(), []);
   const cameraRefRef = useRef(cameraRef);
@@ -99,6 +102,59 @@ export const useScanMode = (
     }
   }, []);
 
+  const fetchEdgeGuide = useCallback(async (frameUri: string) => {
+    try {
+      const { width, height } = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+        RNImage.getSize(frameUri, (w, h) => resolve({ width: w, height: h }), reject);
+      });
+
+      const actions: ImageManipulator.Action[] = [];
+
+      // Crop to match current aspect ratio
+      const isPortrait = height > width;
+      let targetRatio: number;
+      if (aspectRatio === '16:9') targetRatio = 16 / 9;
+      else if (aspectRatio === '1:1') targetRatio = 1;
+      else targetRatio = 4 / 3;
+      const desiredRatio = isPortrait ? targetRatio : 1 / targetRatio;
+      const currentRatio = height / width;
+
+      if (Math.abs(currentRatio - desiredRatio) > 0.01) {
+        let cropW = width, cropH = height;
+        if (currentRatio > desiredRatio) cropH = width * desiredRatio;
+        else cropW = height / desiredRatio;
+        actions.push({
+          crop: {
+            originX: (width - cropW) / 2,
+            originY: (height - cropH) / 2,
+            width: cropW,
+            height: cropH,
+          },
+        });
+      }
+
+      actions.push({ resize: { width: 640 } });
+
+      const processed = await ImageManipulator.manipulateAsync(
+        frameUri, actions,
+        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG },
+      );
+      const blob = await fetch(processed.uri).then(r => r.blob());
+      const response = await fetch(`${baseUrl}/edges`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'image/jpeg' },
+        body: blob,
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      if (data.edge_image) {
+        setEdgeGuideUri(`data:image/png;base64,${data.edge_image}`);
+      }
+    } catch (e) {
+      console.warn('[ScanMode] Edge detection failed:', e);
+    }
+  }, [baseUrl, aspectRatio]);
+
   const enterScanMode = useCallback(() => {
     setIsScanMode(true);
     setHasResult(false);
@@ -108,6 +164,7 @@ export const useScanMode = (
     setScoredCount(0);
     setGuideUri(null);
     setGuideVisible(false);
+    setEdgeGuideUri(null);
   }, []);
 
   const exitScanMode = useCallback(() => {
@@ -125,6 +182,7 @@ export const useScanMode = (
     setCountdown(SCAN_DURATION_MS / 1000);
     setGuideUri(null);
     setGuideVisible(false);
+    setEdgeGuideUri(null);
     rawFrames.current = [];
     lastCaptureAngles.current = null;
   }, []);
@@ -197,7 +255,10 @@ export const useScanMode = (
 
     setResult({ bestScore, bestFrameUri: scored[bestIndex].uri });
     setHasResult(true);
-  }, [baseUrl]);
+
+    // Pre-fetch edge-detected version while user reads result card
+    fetchEdgeGuide(scored[bestIndex].uri);
+  }, [baseUrl, fetchEdgeGuide]);
 
   // Store ref so the timeout can call it
   stopScanRef.current = finishScanning;
@@ -260,15 +321,16 @@ export const useScanMode = (
     // Stay in scan mode so user can scan again
   }, [result]);
 
-  /** Option 2: Enter guide mode — show overlay on viewfinder */
+  /** Option 2: Enter guide mode — show edge overlay on viewfinder */
   const enterGuideMode = useCallback(() => {
     if (!result) return;
-    setGuideUri(result.bestFrameUri);
+    // Prefer edge-detected image; fall back to raw photo
+    setGuideUri(edgeGuideUri ?? result.bestFrameUri);
     setGuideVisible(true);
     setHasResult(false);
     // Exit scan mode UI but keep guide overlay
     setIsScanMode(false);
-  }, [result]);
+  }, [result, edgeGuideUri]);
 
   const toggleGuide = useCallback(() => {
     setGuideVisible(v => !v);

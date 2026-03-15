@@ -88,7 +88,7 @@ export const CameraScreen = () => {
   const orientation = useDeviceOrientation();
 
   // Scan mode
-  const scan = useScanMode(cameraRef);
+  const scan = useScanMode(cameraRef, aspectRatio);
   const frameProcessor = analysisFrameProcessor;
 
 
@@ -387,7 +387,7 @@ export const CameraScreen = () => {
                 left: 0,
                 right: 0,
                 height: camHeight,
-                opacity: 0.35,
+                opacity: 1,
               }}
               resizeMode="cover"
               pointerEvents="none"
