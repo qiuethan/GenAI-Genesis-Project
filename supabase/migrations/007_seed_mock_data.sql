@@ -71,6 +71,7 @@ ON CONFLICT (id) DO UPDATE SET
   submissions_close_at = EXCLUDED.submissions_close_at;
 
 -- Step 2: Create mock auth users (skips if they already exist)
+SET search_path TO public, extensions, auth;
 DO $$
 DECLARE
   _users jsonb := '[

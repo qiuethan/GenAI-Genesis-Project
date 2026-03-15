@@ -18,12 +18,19 @@ import { PostCardContextMenu } from './PostCardContextMenu';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
+const RANK_COLORS: Record<number, { color: string; bg: string }> = {
+  1: { color: '#FFD700', bg: 'rgba(255, 215, 0, 0.15)' },
+  2: { color: '#C0C0C0', bg: 'rgba(192, 192, 192, 0.12)' },
+  3: { color: '#CD7F32', bg: 'rgba(205, 127, 50, 0.12)' },
+};
+
 interface PostCardProps {
   item: FeedItem;
   currentUserId?: string;
   onPressPhoto?: () => void;
   onPressUser?: () => void;
   showRank?: boolean;
+  totalSubmissions?: number;
 }
 
 export function PostCard({
@@ -32,6 +39,7 @@ export function PostCard({
   onPressPhoto,
   onPressUser,
   showRank = false,
+  totalSubmissions,
 }: PostCardProps) {
   const compositionLabel = COMPOSITION_LABELS[item.composition_type] ?? item.composition_type;
 
@@ -93,15 +101,25 @@ export function PostCard({
             <Text style={styles.username}>{item.user.display_name || item.user.username}</Text>
             {item.user.composition_badge && (
               <View style={styles.badge}>
-                <Text style={styles.badgeText}>◈ {item.user.composition_badge}</Text>
+                <Text style={styles.badgeText}>◈ Best at {item.user.composition_badge}</Text>
               </View>
             )}
           </View>
           <Text style={styles.timestamp}>{timeAgo(item.submitted_at)}</Text>
         </View>
-        {showRank && item.rank != null && (
+        {showRank && item.rank != null && item.rank <= 3 && (
+          <View style={[styles.rankBadge, { backgroundColor: RANK_COLORS[item.rank]?.bg }]}>
+            <Ionicons name="trophy" size={14} color={RANK_COLORS[item.rank]?.color} />
+            <Text style={[styles.rankText, { color: RANK_COLORS[item.rank]?.color }]}>
+              {item.rank}
+            </Text>
+          </View>
+        )}
+        {showRank && item.rank != null && item.rank > 3 && (
           <View style={styles.rankBadge}>
-            <Text style={styles.rankText}>#{item.rank}</Text>
+            <Text style={styles.rankText}>
+              #{item.rank}{totalSubmissions ? `/${totalSubmissions}` : ''}
+            </Text>
           </View>
         )}
         {showRank && item.rank == null && (
@@ -179,6 +197,7 @@ export function PostCard({
         currentUserId={currentUserId}
         isOwnPost={currentUserId === item.user_id}
         compositionLabel={compositionLabel}
+        onSaved={() => setSaved(true)}
       />
     </View>
   );
@@ -244,6 +263,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   rankBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: '#1a1a1a',
     borderRadius: 8,
     paddingHorizontal: 10,

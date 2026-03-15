@@ -20,6 +20,7 @@ interface ContextMenuProps {
   currentUserId?: string;
   isOwnPost: boolean;
   compositionLabel: string;
+  onSaved?: () => void;
 }
 
 export function PostCardContextMenu({
@@ -30,12 +31,14 @@ export function PostCardContextMenu({
   currentUserId,
   isOwnPost,
   compositionLabel,
+  onSaved,
 }: ContextMenuProps) {
   const handleSave = async () => {
     if (!currentUserId) return;
     try {
       await savePost(currentUserId, submissionId);
       hapticMedium();
+      onSaved?.();
       onClose();
     } catch {
       Alert.alert('Error', 'Could not save post.');

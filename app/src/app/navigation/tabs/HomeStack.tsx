@@ -7,6 +7,7 @@ import { UserProfileScreen } from '../../../features/profile/screens/UserProfile
 import { UserSearchScreen } from '../../../features/profile/screens/UserSearchScreen';
 import { FollowersListScreen } from '../../../features/profile/screens/FollowersListScreen';
 import { FollowingListScreen } from '../../../features/profile/screens/FollowingListScreen';
+import { PhotoViewerScreen } from '../../../shared/screens/PhotoViewerScreen';
 import type { HomeStackParamList } from '../types';
 
 const Stack = createNativeStackNavigator<HomeStackParamList>();
@@ -25,6 +26,11 @@ export function HomeStack() {
       <Stack.Screen name="UserProfile" component={UserProfileScreen} />
       <Stack.Screen name="FollowersList" component={FollowersListScreen} />
       <Stack.Screen name="FollowingList" component={FollowingListScreen} />
+      <Stack.Screen
+        name="PhotoViewer"
+        component={PhotoViewerScreen}
+        options={{ presentation: 'fullScreenModal', animation: 'fade' }}
+      />
     </Stack.Navigator>
   );
 }
