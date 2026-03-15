@@ -129,19 +129,13 @@ const TriangleOverlay: React.FC<{ width: number; height: number }> = ({ width, h
   );
 };
 
-// Map Gemini classification labels to overlay components
+// Map classifier output to overlay components (only types with visual overlays)
 const OVERLAY_MAP: Record<string, string> = {
   rule_of_thirds: 'rule_of_thirds',
   golden_ratio: 'golden_ratio',
-  symmetry: 'symmetry',
-  leading_lines: 'diagonals',
-  diagonals: 'diagonals',
-  triangles: 'triangles',
-  negative_space: 'center_frame',
-  framing: 'center_frame',
-  foreground_interest: 'foreground',
-  layering: 'layering',
-  patterns: 'quadrants',
+  symmetric: 'symmetry',
+  diagonal: 'diagonals',
+  triangle: 'triangles',
 };
 
 export const CompositionPatternOverlay: React.FC<Props> = ({ compositionType, visible }) => {

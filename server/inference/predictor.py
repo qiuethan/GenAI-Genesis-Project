@@ -145,8 +145,7 @@ class ImagePredictor:
         probs = F.softmax(logits, dim=1)[0]
         idx = int(probs.argmax().item())
         raw_class = self.comp_types[idx]
-        app_type = COMP_CLASS_TO_OVERLAY.get(raw_class)
-        return {'composition_type': app_type}
+        return {'composition_type': raw_class}
 
     def _predict_samp(self, tensor: torch.Tensor, frame_bgr: np.ndarray) -> dict:
         # Compute saliency map
@@ -221,6 +220,6 @@ class ImagePredictor:
             indices = probs.argmax(dim=1)
             for i, idx in enumerate(indices):
                 raw_class = self.comp_types[int(idx.item())]
-                results[i]['composition_type'] = COMP_CLASS_TO_OVERLAY.get(raw_class)
+                results[i]['composition_type'] = raw_class
 
         return results

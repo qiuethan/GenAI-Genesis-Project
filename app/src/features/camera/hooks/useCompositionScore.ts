@@ -13,6 +13,7 @@ export interface CompositionResult {
   composition_score?: number;
   distribution?: number[];
   attributes?: Record<string, number>;
+  composition_type?: string | null;
 }
 
 export interface UseCompositionScoreConfig {

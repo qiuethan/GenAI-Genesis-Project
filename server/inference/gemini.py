@@ -1,4 +1,4 @@
-"""Gemini-based composition classification and visualization."""
+"""Gemini-based composition visualization."""
 
 from __future__ import annotations
 
@@ -24,20 +24,6 @@ def _load_api_key() -> str:
     return key
 
 
-# Only composition types that have drawable overlays
-ALLOWED_TYPES = {
-    'rule_of_thirds', 'symmetry', 'leading_lines', 'diagonals',
-    'triangles', 'golden_ratio', 'negative_space', 'foreground_interest',
-    'layering', 'patterns', 'framing',
-}
-
-CLASSIFY_PROMPT = (
-    "Look at this photograph and identify which composition technique is most dominant. "
-    "Reply with ONLY one of these exact labels, nothing else:\n"
-    "rule_of_thirds, symmetry, leading_lines, diagonals, triangles, golden_ratio, "
-    "negative_space, foreground_interest, layering, patterns, framing"
-)
-
 ANALYZE_PROMPT = (
     "Analyze the composition of this photograph. Identify which of these composition "
     "techniques are present:\n"
@@ -57,45 +43,6 @@ ANALYZE_PROMPT = (
     "techniques that are clearly present — do not force techniques that aren't there. "
     "Keep the original photo clearly visible underneath."
 )
-
-
-def classify_composition(image_bytes: bytes) -> str | None:
-    """Classify the dominant composition technique using Gemini text model.
-
-    Returns one of the ALLOWED_TYPES labels, or None if classification fails.
-    Uses gemini-2.5-flash-lite for fast (~450ms) text-only classification.
-    Retries once if response is not a valid label.
-    """
-    api_key = _load_api_key()
-    client = genai.Client(api_key=api_key)
-    pil_image = Image.open(io.BytesIO(image_bytes))
-
-    # First attempt
-    response = client.models.generate_content(
-        model='gemini-2.5-flash-lite',
-        contents=[CLASSIFY_PROMPT, pil_image],
-    )
-    result = (response.text or '').strip().lower().replace(' ', '_')
-
-    if result in ALLOWED_TYPES:
-        return result
-
-    # Retry with error feedback
-    retry_prompt = (
-        f"Your response '{result}' is not one of the allowed labels. "
-        f"You MUST respond with exactly one of: "
-        f"{', '.join(sorted(ALLOWED_TYPES))}. Try again."
-    )
-    response = client.models.generate_content(
-        model='gemini-2.5-flash-lite',
-        contents=[CLASSIFY_PROMPT, pil_image, retry_prompt],
-    )
-    result = (response.text or '').strip().lower().replace(' ', '_')
-
-    if result in ALLOWED_TYPES:
-        return result
-
-    return None
 
 
 def analyze_composition_with_gemini(image_bytes: bytes) -> bytes | None:
