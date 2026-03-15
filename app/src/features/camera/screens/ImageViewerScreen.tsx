@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { View, FlatList, ViewToken } from 'react-native';
+import React, { useState, useRef, useCallback } from 'react';
+import { View, FlatList, ViewToken, StyleSheet, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
