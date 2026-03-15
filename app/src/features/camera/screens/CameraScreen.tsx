@@ -48,7 +48,7 @@ export const CameraScreen = () => {
   // State
   const [position, setPosition] = useState<CameraPosition>('back');
   const [flash, setFlash] = useState<FlashMode>('off');
-  const [aspectRatio, setAspectRatio] = useState<'4:3' | '16:9' | '1:1'>('4:3');
+  const aspectRatio = '4:3' as const;
   const [lastPhoto, setLastPhoto] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [sceneBrightness, setSceneBrightness] = useState<number>(0.5);
@@ -74,16 +74,13 @@ export const CameraScreen = () => {
     enabled: isFocused,
   });
 
-  // Calculate camera height based on aspect ratio
-  let camHeight = screenWidth * 4 / 3; // Default 4:3
-  if (aspectRatio === '16:9') camHeight = screenWidth * 16 / 9;
-  if (aspectRatio === '1:1') camHeight = screenWidth;
+  // Calculate camera height based on aspect ratio (4:3 only)
+  const camHeight = screenWidth * 4 / 3;
 
-  // Calculate top margin to center camera with bottom bias (x=60 taller bottom bar)
-  // T = (EmptySpace - x) / 2
-  const verticalBias = 60;
+  // Calculate top margin to center camera with bottom bias
+  const verticalBias = 100;
   const centeredTopMargin = Math.max(0, (screenHeight - camHeight - verticalBias) / 2);
-  const topMargin = aspectRatio === '16:9' ? 0 : centeredTopMargin;
+  const topMargin = centeredTopMargin;
 
   // Animated values for smooth transitions
   const animatedHeight = useRef(new Animated.Value(camHeight)).current;
@@ -104,7 +101,7 @@ export const CameraScreen = () => {
   const composition = useCompositionScore({
     cameraRef,
     aspectRatio,
-    enabled: isFocused && !scan.isScanMode,
+    enabled: isFocused,
   });
 
   // Mapping device orientation to UI rotation
@@ -157,12 +154,6 @@ export const CameraScreen = () => {
     }).start();
   }, [isPinching]);
 
-  const cycleAspectRatio = () => {
-    if (aspectRatio === '4:3') setAspectRatio('16:9');
-    else if (aspectRatio === '16:9') setAspectRatio('1:1');
-    else setAspectRatio('4:3');
-  };
-
   // Handlers
   const doCapture = async () => {
     try {
@@ -185,9 +176,7 @@ export const CameraScreen = () => {
         Image.getSize(`file://${path}`, (w, h) => resolve({ width: w, height: h }), reject);
       });
 
-      let targetRatio = 4 / 3;
-      if (aspectRatio === '16:9') targetRatio = 16 / 9;
-      if (aspectRatio === '1:1') targetRatio = 1;
+      const targetRatio = 4 / 3;
 
       // Handle portrait vs landscape
       const isPortrait = height > width;
@@ -291,8 +280,8 @@ export const CameraScreen = () => {
 
   if (!hasPermission) return <View style={styles.center}><Text style={styles.text}>No Permission</Text></View>;
 
-  const aestheticColor = composition.result ? scoreToColor(composition.result.score) : '#666';
-  const compositionColor = composition.result ? scoreToColor(composition.result.score) : '#666';
+  const aestheticColor = composition.result ? scoreToColor(composition.result.aesthetic_score) : '#666';
+  const compositionColor = composition.result?.composition_score != null ? scoreToColor(composition.result.composition_score) : '#666';
 
   return (
     <View style={styles.container}>
@@ -359,7 +348,7 @@ export const CameraScreen = () => {
             </Animated.View>
 
             {/* Bottom Mask */}
-            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' }} />
+            <View style={{ flex: 1 }} />
           </View>
 
           {/* Timer Countdown Overlay */}
@@ -489,7 +478,7 @@ export const CameraScreen = () => {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6 }}>
               <Ionicons name="flower-outline" size={15} color={aestheticColor} />
               <Text style={{ color: aestheticColor, fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
-                {composition.result ? Math.round(composition.result.score) : '--'}
+                {composition.result ? Math.round(composition.result.aesthetic_score) : '--'}
               </Text>
             </View>
 
@@ -497,7 +486,7 @@ export const CameraScreen = () => {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6 }}>
               <MaterialCommunityIcons name="image-filter-hdr" size={15} color={compositionColor} />
               <Text style={{ color: compositionColor, fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
-                {composition.result ? Math.round(composition.result.score) : '--'}
+                {composition.result?.composition_score != null ? Math.round(composition.result.composition_score) : '--'}
               </Text>
             </View>
           </View>
@@ -544,8 +533,6 @@ export const CameraScreen = () => {
               isOpen={isMenuOpen}
               flashMode={flash}
               onFlashPress={toggleFlash}
-              aspectRatio={aspectRatio}
-              onAspectRatioPress={cycleAspectRatio}
               timerDuration={timer.timerDuration}
               onTimerPress={timer.cycleTimer}
               nightMode={nightMode.nightMode}
@@ -635,6 +622,25 @@ export const CameraScreen = () => {
 
         {/* Main Controls Background */}
         <View style={[styles.controlsBackground, { paddingBottom: Math.max(0, insets.bottom - 10) }]}>
+          {/* Mode Selector */}
+          <View style={styles.modeTextWrapper}>
+            {!scan.isScanMode ? (
+              <View style={{ flexDirection: 'row', gap: 20 }}>
+                <Text style={styles.modeText}>PHOTO</Text>
+                <TouchableOpacity onPress={scan.enterScanMode}>
+                  <Text style={[styles.modeText, { color: 'white', opacity: 0.6 }]}>SCAN</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', gap: 20 }}>
+                <TouchableOpacity onPress={scan.exitScanMode}>
+                  <Text style={[styles.modeText, { color: 'white', opacity: 0.6 }]}>PHOTO</Text>
+                </TouchableOpacity>
+                <Text style={[styles.modeText, { color: '#00ff88' }]}>SCAN</Text>
+              </View>
+            )}
+          </View>
+
           {/* Main Control Bar */}
           <View style={styles.controlBar}>
             {/* Gallery Thumbnail */}
@@ -669,25 +675,6 @@ export const CameraScreen = () => {
                 />
               </View>
             </RotatableView>
-          </View>
-
-          {/* Mode Selector */}
-          <View style={styles.modeTextWrapper}>
-            {!scan.isScanMode ? (
-              <View style={{ flexDirection: 'row', gap: 20 }}>
-                <Text style={styles.modeText}>PHOTO</Text>
-                <TouchableOpacity onPress={scan.enterScanMode}>
-                  <Text style={[styles.modeText, { color: 'white', opacity: 0.6 }]}>SCAN</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={{ flexDirection: 'row', gap: 20 }}>
-                <TouchableOpacity onPress={scan.exitScanMode}>
-                  <Text style={[styles.modeText, { color: 'white', opacity: 0.6 }]}>PHOTO</Text>
-                </TouchableOpacity>
-                <Text style={[styles.modeText, { color: '#00ff88' }]}>SCAN</Text>
-              </View>
-            )}
           </View>
         </View>
       </View>

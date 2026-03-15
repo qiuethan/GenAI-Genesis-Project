@@ -22,5 +22,7 @@ export { useExposureCoach } from './useExposureCoach';
 export type { BlurCoachState, BlurCoachConfig, UseBlurCoachReturn } from './useBlurCoach';
 export { useGalleryScores, scorePhoto, cacheScore } from './useGalleryScores';
 export type { GalleryScore } from './useGalleryScores';
+export { useCompositionScore } from './useCompositionScore';
+export type { CompositionResult, UseCompositionScoreConfig } from './useCompositionScore';
 export { useScanMode } from './useScanMode';
 export type { ScanResult } from './useScanMode';

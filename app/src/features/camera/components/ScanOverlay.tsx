@@ -33,7 +33,7 @@ export const ScanOverlay: React.FC<Props> = ({
     <View style={[StyleSheet.absoluteFill, { zIndex: 100 }]} pointerEvents="box-none">
       {/* Ready state */}
       {!isScanning && !isProcessing && !hasResult && !error && (
-        <View style={[s.centerRow, { top: cameraFrameTop + cameraFrameHeight - 100 }]}>
+        <View style={[s.centerRow, { top: cameraFrameTop + cameraFrameHeight - 120 }]}>
           <TouchableOpacity style={s.scanBtn} onPress={onStartScan}>
             <Text style={s.scanText}>Start Scan</Text>
           </TouchableOpacity>
@@ -51,7 +51,7 @@ export const ScanOverlay: React.FC<Props> = ({
             </View>
           </View>
 
-          <View style={[s.centerRow, { top: cameraFrameTop + cameraFrameHeight - 100 }]}>
+          <View style={[s.centerRow, { top: cameraFrameTop + cameraFrameHeight - 120 }]}>
             <TouchableOpacity style={s.stopBtn} onPress={onStopScan}>
               <Text style={s.stopText}>Done Scanning</Text>
             </TouchableOpacity>

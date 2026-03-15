@@ -3,7 +3,7 @@ import { StyleSheet } from 'react-native';
 export const cameraStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'black',
+    backgroundColor: '#0a0a0a',
   },
   center: {
     flex: 1,
@@ -35,7 +35,7 @@ export const cameraStyles = StyleSheet.create({
   chevronContainer: {},
   bottomBar: {
     position: 'absolute',
-    bottom: 0,
+    bottom: -10,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -44,7 +44,8 @@ export const cameraStyles = StyleSheet.create({
   controlsBackground: {
     width: '100%',
     alignItems: 'center',
-    paddingTop: 16,
+    paddingTop: 10,
+    backgroundColor: 'rgba(0,0,0,0.6)',
   },
   menuContainer: {
     position: 'absolute',
@@ -130,7 +131,7 @@ export const cameraStyles = StyleSheet.create({
     padding: 6,
   },
   modeTextWrapper: {
-    marginTop: 20,
+    marginBottom: 8,
   },
   modeText: {
     color: '#ffe81f',

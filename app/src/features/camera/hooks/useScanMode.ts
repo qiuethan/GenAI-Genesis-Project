@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import { Image } from 'react-native';
 import { DeviceMotion } from 'expo-sensors';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { CameraHandle } from '../../../infra/visionCamera';
@@ -216,7 +217,19 @@ export const useScanMode = (
     setScoredCount(0);
     setCountdown(SCAN_DURATION_MS / 1000);
 
-    // Take an initial frame immediately
+    // Auto-stop after 6 seconds
+    scanTimerRef.current = setTimeout(() => {
+      stopScanRef.current?.();
+    }, SCAN_DURATION_MS);
+
+    // Countdown ticker
+    const startTime = Date.now();
+    countdownRef.current = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((SCAN_DURATION_MS - (Date.now() - startTime)) / 1000));
+      setCountdown(remaining);
+    }, 200);
+
+    // Take an initial frame (non-blocking so timer/countdown start immediately)
     try {
       const cam = cameraRefRef.current.current;
       if (cam) {
@@ -229,18 +242,6 @@ export const useScanMode = (
         }
       }
     } catch {}
-
-    // Auto-stop after 6 seconds
-    scanTimerRef.current = setTimeout(() => {
-      stopScanRef.current?.();
-    }, SCAN_DURATION_MS);
-
-    // Countdown ticker
-    const startTime = Date.now();
-    countdownRef.current = setInterval(() => {
-      const remaining = Math.max(0, Math.ceil((SCAN_DURATION_MS - (Date.now() - startTime)) / 1000));
-      setCountdown(remaining);
-    }, 200);
   }, []);
 
   /** Stop scan early (manual) */
@@ -248,11 +249,39 @@ export const useScanMode = (
     finishScanning();
   }, [finishScanning]);
 
-  /** Option 1: Save best photo directly to gallery */
+  /** Option 1: Save best photo directly to gallery (cropped to 4:3) */
   const saveBest = useCallback(async () => {
     if (!result) return;
     try {
-      const asset = await saveToLibrary(result.bestFrameUri);
+      const { width, height } = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+        Image.getSize(result.bestFrameUri, (w, h) => resolve({ width: w, height: h }), reject);
+      });
+
+      const isPortrait = height > width;
+      const targetRatio = 4 / 3;
+      const desiredRatio = isPortrait ? targetRatio : 1 / targetRatio;
+      const currentRatio = height / width;
+
+      let finalUri = result.bestFrameUri;
+
+      if (Math.abs(currentRatio - desiredRatio) > 0.01) {
+        let cropWidth = width;
+        let cropHeight = height;
+        if (currentRatio > desiredRatio) {
+          cropHeight = width * desiredRatio;
+        } else {
+          cropWidth = height / desiredRatio;
+        }
+
+        const cropped = await ImageManipulator.manipulateAsync(
+          result.bestFrameUri,
+          [{ crop: { originX: (width - cropWidth) / 2, originY: (height - cropHeight) / 2, width: cropWidth, height: cropHeight } }],
+          { compress: 1, format: ImageManipulator.SaveFormat.JPEG },
+        );
+        finalUri = cropped.uri;
+      }
+
+      const asset = await saveToLibrary(finalUri);
       await cacheScore(asset.id, result.bestScore);
     } catch {}
     setHasResult(false);
