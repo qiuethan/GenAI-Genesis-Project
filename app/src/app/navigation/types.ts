@@ -49,6 +49,7 @@ export type CameraStackParamList = {
   ImageViewer: {
     imageUri: string;
     allPhotos?: string[];
+    allPhotoIds?: string[];
     initialIndex?: number;
   };
   SubmitPhoto: {

@@ -46,6 +46,7 @@ server/debug_frames/
 __pycache__/
 *.pyc
 *.pth
+*.pt
 *.egg-info/
 
 # External reference repos/datasets

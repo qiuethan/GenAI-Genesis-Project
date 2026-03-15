@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
-import { Image } from 'react-native';
+import { Image as RNImage } from 'react-native';
 import { DeviceMotion } from 'expo-sensors';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { CameraHandle } from '../../../infra/visionCamera';
@@ -17,6 +17,7 @@ const TILT_THRESHOLD_DEG = 0.5;
 
 export const useScanMode = (
   cameraRef: React.RefObject<CameraHandle | null>,
+  aspectRatio: '4:3' | '16:9' | '1:1' = '4:3',
 ) => {
   const [isScanMode, setIsScanMode] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
@@ -30,12 +31,24 @@ export const useScanMode = (
   // Guide overlay state
   const [guideUri, setGuideUri] = useState<string | null>(null);
   const [guideVisible, setGuideVisible] = useState(false);
+  const [edgeGuideUri, setEdgeGuideUri] = useState<string | null>(null);
+
+  // Auto-swap to edge image when it arrives (handles the case where
+  // user entered guide mode before edge detection completed)
+  useEffect(() => {
+    if (edgeGuideUri && guideVisible) {
+      setGuideUri(edgeGuideUri);
+    }
+  }, [edgeGuideUri, guideVisible]);
 
   const baseUrl = useMemo(() => getServerUrl(), []);
   const cameraRefRef = useRef(cameraRef);
   cameraRefRef.current = cameraRef;
+  const aspectRatioRef = useRef(aspectRatio);
+  aspectRatioRef.current = aspectRatio;
 
   const rawFrames = useRef<string[]>([]);
+  const capturedFrames = useRef<{ uri: string; score: number; valid: boolean }[]>([]);
   const cancelledRef = useRef(false);
   const isCapturingRef = useRef(false);
   const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -100,6 +113,59 @@ export const useScanMode = (
     }
   }, []);
 
+  const fetchEdgeGuide = useCallback(async (frameUri: string) => {
+    try {
+      const { width, height } = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+        RNImage.getSize(frameUri, (w, h) => resolve({ width: w, height: h }), reject);
+      });
+
+      const actions: ImageManipulator.Action[] = [];
+
+      // Crop to match current aspect ratio
+      const isPortrait = height > width;
+      let targetRatio: number;
+      if (aspectRatioRef.current === '16:9') targetRatio = 16 / 9;
+      else if (aspectRatioRef.current === '1:1') targetRatio = 1;
+      else targetRatio = 4 / 3;
+      const desiredRatio = isPortrait ? targetRatio : 1 / targetRatio;
+      const currentRatio = height / width;
+
+      if (Math.abs(currentRatio - desiredRatio) > 0.01) {
+        let cropW = width, cropH = height;
+        if (currentRatio > desiredRatio) cropH = width * desiredRatio;
+        else cropW = height / desiredRatio;
+        actions.push({
+          crop: {
+            originX: (width - cropW) / 2,
+            originY: (height - cropH) / 2,
+            width: cropW,
+            height: cropH,
+          },
+        });
+      }
+
+      actions.push({ resize: { width: 640 } });
+
+      const processed = await ImageManipulator.manipulateAsync(
+        frameUri, actions,
+        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG },
+      );
+      const blob = await fetch(processed.uri).then(r => r.blob());
+      const response = await fetch(`${baseUrl}/edges`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'image/jpeg' },
+        body: blob,
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      if (data.edge_image) {
+        setEdgeGuideUri(`data:image/png;base64,${data.edge_image}`);
+      }
+    } catch (e) {
+      console.warn('[ScanMode] Edge detection failed:', e);
+    }
+  }, [baseUrl]);
+
   const enterScanMode = useCallback(() => {
     setIsScanMode(true);
     setHasResult(false);
@@ -109,6 +175,7 @@ export const useScanMode = (
     setScoredCount(0);
     setGuideUri(null);
     setGuideVisible(false);
+    setEdgeGuideUri(null);
   }, []);
 
   const exitScanMode = useCallback(() => {
@@ -126,6 +193,7 @@ export const useScanMode = (
     setCountdown(SCAN_DURATION_MS / 1000);
     setGuideUri(null);
     setGuideVisible(false);
+    setEdgeGuideUri(null);
     rawFrames.current = [];
     lastCaptureAngles.current = null;
   }, []);
@@ -162,22 +230,27 @@ export const useScanMode = (
         });
         if (!response.ok) return null;
         const data = await response.json();
-        return { uri, score: data.score ?? 0 };
+
+        const score = data.aesthetic_score ?? data.score ?? 0;
+
+        // Object tracking is done on-device — we just need to know if they're still visible
+        // The checkObjectsInFrame function is called from the component with live detections
+        capturedFrames.current.push({
+          uri,
+          score,
+          valid: true, // will be updated by component via markLastFrameValid
+        });
+
+        return { uri, score };
       } catch {
         return null;
       }
     };
 
-    const BATCH_SIZE = 3;
-    let count = 0;
-    for (let i = 0; i < frames.length; i += BATCH_SIZE) {
-      const batch = frames.slice(i, i + BATCH_SIZE);
-      const results = await Promise.all(batch.map(scoreFrame));
-      for (const r of results) {
-        if (r) scored.push(r);
-      }
-      count += batch.length;
-      setScoredCount(count);
+    for (let i = 0; i < frames.length; i++) {
+      const r = await scoreFrame(frames[i]);
+      if (r) scored.push(r);
+      setScoredCount(i + 1);
     }
 
     setIsProcessing(false);
@@ -198,7 +271,10 @@ export const useScanMode = (
 
     setResult({ bestScore, bestFrameUri: scored[bestIndex].uri });
     setHasResult(true);
-  }, [baseUrl]);
+
+    // Pre-fetch edge-detected version while user reads result card
+    fetchEdgeGuide(scored[bestIndex].uri);
+  }, [baseUrl, fetchEdgeGuide]);
 
   // Store ref so the timeout can call it
   stopScanRef.current = finishScanning;
@@ -254,7 +330,7 @@ export const useScanMode = (
     if (!result) return;
     try {
       const { width, height } = await new Promise<{ width: number; height: number }>((resolve, reject) => {
-        Image.getSize(result.bestFrameUri, (w, h) => resolve({ width: w, height: h }), reject);
+        RNImage.getSize(result.bestFrameUri, (w: number, h: number) => resolve({ width: w, height: h }), reject);
       });
 
       const isPortrait = height > width;
@@ -289,15 +365,16 @@ export const useScanMode = (
     // Stay in scan mode so user can scan again
   }, [result]);
 
-  /** Option 2: Enter guide mode — show overlay on viewfinder */
+  /** Option 2: Enter guide mode — show edge overlay on viewfinder */
   const enterGuideMode = useCallback(() => {
     if (!result) return;
-    setGuideUri(result.bestFrameUri);
+    // Prefer edge-detected image; fall back to raw photo
+    setGuideUri(edgeGuideUri ?? result.bestFrameUri);
     setGuideVisible(true);
     setHasResult(false);
     // Exit scan mode UI but keep guide overlay
     setIsScanMode(false);
-  }, [result]);
+  }, [result, edgeGuideUri]);
 
   const toggleGuide = useCallback(() => {
     setGuideVisible(v => !v);

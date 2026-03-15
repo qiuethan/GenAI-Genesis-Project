@@ -128,12 +128,7 @@ export const useShakeCoach = (config?: ShakeCoachConfig): {
       }
     }
 
-    // Update debug metrics without changing hint state
-    setState(prev => ({
-      ...prev,
-      debugMetrics,
-    }));
-  }, [motion, cfg.enabled, cfg.triggerDelayMs, cfg.clearDelayMs]);
+  }, [motion.isShaking, cfg.enabled, cfg.triggerDelayMs, cfg.clearDelayMs]);
 
   return { state };
 };
