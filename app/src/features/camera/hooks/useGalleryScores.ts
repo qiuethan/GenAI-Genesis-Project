@@ -40,7 +40,7 @@ async function saveCache(): Promise<void> {
  */
 export async function cacheScore(photoId: string, score: number, label: string = ''): Promise<void> {
   await loadCache();
-  _scoreCache[photoId] = { score, label };
+  _scoreCache[photoId] = { aesthetic_score: score, score, label };
   await saveCache();
 }
 

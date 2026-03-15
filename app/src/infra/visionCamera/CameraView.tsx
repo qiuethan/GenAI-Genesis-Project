@@ -28,7 +28,7 @@ export const CameraView = forwardRef<CameraHandle, Props>(({ device, isActive, z
     takePhoto: async (flash) => {
       if (!camera.current) throw new Error("Camera ref is null");
       const photo = await camera.current.takePhoto({
-        flash: flash
+        flash: flash,
       });
       return photo.path;
     },

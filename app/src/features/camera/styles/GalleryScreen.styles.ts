@@ -37,18 +37,6 @@ export const galleryStyles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
   },
-  bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 60,
-    backgroundColor: 'rgba(0,0,0,0.9)',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   gridContainer: {
     padding: SPACING,
   },

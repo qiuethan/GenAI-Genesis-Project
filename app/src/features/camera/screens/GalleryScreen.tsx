@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, FlatList, TouchableOpacity, ActivityIndicator, Text, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { IconButton } from '../components/IconButton';
-import { useGallery, useGalleryScores } from '../hooks';
+import { useGallery, useGalleryScores, scorePhoto } from '../hooks';
 import { PhotoAsset } from '../../../infra/mediaLibrary';
 import { galleryStyles as styles, GALLERY_CONSTANTS } from '../styles/GalleryScreen.styles';
 
@@ -22,7 +22,34 @@ export const GalleryScreen = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { photos, loading } = useGallery(100);
-  const { scores } = useGalleryScores();
+  const { scores, refresh } = useGalleryScores();
+  const scoringInProgress = useRef<Set<string>>(new Set());
+
+  // Refresh scores when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      refresh();
+    }, [refresh])
+  );
+
+  // Auto-score unscored photos and refresh UI as results arrive
+  useEffect(() => {
+    if (photos.length === 0) return;
+
+    const unscoredPhotos = photos.filter(
+      p => !scores[p.id] && !scoringInProgress.current.has(p.id)
+    );
+
+    if (unscoredPhotos.length === 0) return;
+
+    unscoredPhotos.forEach(photo => {
+      scoringInProgress.current.add(photo.id);
+      scorePhoto(photo.id, photo.uri)
+        .then(() => refresh())
+        .catch(() => {})
+        .finally(() => scoringInProgress.current.delete(photo.id));
+    });
+  }, [photos, scores, refresh]);
 
   const handlePhotoPress = (photo: PhotoAsset, index: number) => {
     (navigation as any).navigate('ImageViewer', {
@@ -48,16 +75,11 @@ export const GalleryScreen = () => {
           style={styles.photoImage}
           contentFit="cover"
         />
-        {score && (
+        {score && (score.aesthetic_score ?? score.score) != null && (
           <View style={badgeStyles.badgeContainer}>
-            <View style={[badgeStyles.badge, { backgroundColor: scoreToColor(score.aesthetic_score) }]}>
-              <Text style={badgeStyles.text}>👁 {Math.round(score.aesthetic_score)}</Text>
+            <View style={[badgeStyles.badge, { backgroundColor: scoreToColor(score.aesthetic_score ?? score.score!) }]}>
+              <Text style={badgeStyles.text}>{Math.round(score.aesthetic_score ?? score.score!)}</Text>
             </View>
-            {score.composition_score != null && (
-              <View style={[badgeStyles.badge, { backgroundColor: scoreToColor(score.composition_score) }]}>
-                <Text style={badgeStyles.text}>📐 {Math.round(score.composition_score)}</Text>
-              </View>
-            )}
           </View>
         )}
       </TouchableOpacity>
@@ -100,16 +122,12 @@ export const GalleryScreen = () => {
           styles.gridContainer,
           {
             paddingTop: insets.top + 60,
-            paddingBottom: insets.bottom + 80
+            paddingBottom: insets.bottom + 20
           }
         ]}
         columnWrapperStyle={styles.row}
       />
 
-      {/* Bottom Bar */}
-      <View style={[styles.bottomBar, { paddingBottom: insets.bottom }]}>
-        {/* Placeholder for future controls */}
-      </View>
     </View>
   );
 };

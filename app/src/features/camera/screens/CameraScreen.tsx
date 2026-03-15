@@ -218,10 +218,8 @@ export const CameraScreen = () => {
 
       const asset = await saveToLibrary(finalPath);
 
-      // Score the photo if composition guide is active
-      if (scan.guideVisible && scan.guideUri) {
-        scorePhoto(asset.id, asset.uri).catch(() => {});
-      }
+      // Score every captured photo
+      scorePhoto(asset.id, asset.uri).catch(() => {});
 
       // Get displayable URI (ph:// can't be loaded by <Image>)
       const displayUri = await getLatestPhoto();
