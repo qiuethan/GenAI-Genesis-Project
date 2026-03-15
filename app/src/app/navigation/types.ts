@@ -58,6 +58,7 @@ export type CameraStackParamList = {
     allPhotos?: string[];
     allPhotoIds?: string[];
     initialIndex?: number;
+    albumId?: string;
   };
   SubmitPhoto: {
     challengeId: string;
