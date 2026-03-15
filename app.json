@@ -19,7 +19,7 @@
         "ITSAppUsesNonExemptEncryption": false
       },
       "supportsTablet": true,
-      "bundleIdentifier": "com.ethanqiu.Frame"
+      "bundleIdentifier": "com.zachary.Frame"
     },
     "android": {
       "adaptiveIcon": {

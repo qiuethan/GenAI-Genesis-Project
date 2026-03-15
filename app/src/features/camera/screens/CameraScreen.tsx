@@ -29,7 +29,8 @@ import { IconButton } from '../components/IconButton';
 import { RotatableView } from '../components/RotatableView';
 import { ShutterFlash, ShutterFlashHandle } from '../components/ShutterFlash';
 import { CameraControlsMenu } from '../components/CameraControlsMenu';
-import { useTimer, useNightMode, useExposure, useFocus, useShakeCoach, useLevelCoach, useExposureCoach, useScanMode, scorePhoto } from '../hooks';
+import { useTimer, useNightMode, useExposure, useFocus, useShakeCoach, useLevelCoach, useExposureCoach, useCompositionScore, scorePhoto, useScanMode, getAutoScoreEnabled, loadAutoScore } from '../hooks';
+import { useCompositionType } from '../hooks/useCompositionType';
 import { ShakeCoachOverlay } from '../components/ShakeCoachOverlay';
 import { LevelCoachOverlay } from '../components/LevelCoachOverlay';
 import { ExposureCoachOverlay } from '../components/ExposureCoachOverlay';
@@ -53,6 +54,9 @@ export const CameraScreen = () => {
   const shakeCoach = useShakeCoach();
   const levelCoach = useLevelCoach();
   const exposureCoach = useExposureCoach();
+
+  // Warm auto-score cache
+  useEffect(() => { loadAutoScore(); }, []);
 
   // Hooks
   const navigation = useNavigation();
@@ -99,6 +103,13 @@ export const CameraScreen = () => {
 
   // Composition assessment via Mac server over USB
   const composition = useCompositionScore({
+    cameraRef,
+    aspectRatio,
+    enabled: isFocused && !scanActive && !scan.hasResult,
+  });
+
+  // Composition type classification via Gemini (every 5s)
+  const compositionType = useCompositionType({
     cameraRef,
     aspectRatio,
     enabled: isFocused && !scanActive && !scan.hasResult,
@@ -235,6 +246,10 @@ export const CameraScreen = () => {
       const displayUri = await getLatestPhoto();
       if (displayUri) setLastPhoto(displayUri);
 
+      // Score the newly captured photo in the background (if auto-score enabled)
+      if (getAutoScoreEnabled()) {
+        scorePhoto(asset.id, asset.uri).catch(() => {});
+      }
     } catch (e) {
       console.error("Processing failed", e);
     }
@@ -346,8 +361,8 @@ export const CameraScreen = () => {
             {/* Clear Middle with Grid */}
             <Animated.View style={{ height: animatedHeight, width: screenWidth, alignSelf: 'center' }}>
               <CompositionPatternOverlay
-                dominantPattern={composition.result?.dominant_pattern}
-                visible={!scanActive && composition.result?.dominant_pattern !== undefined}
+                compositionType={compositionType.compositionType ?? undefined}
+                visible={!scanActive && compositionType.compositionType != null}
               />
             </Animated.View>
 
@@ -409,6 +424,14 @@ export const CameraScreen = () => {
             />
           )}
 
+          {/* Composition Score Overlay */}
+          <CompositionScoreOverlay
+            result={composition.result}
+            connected={composition.connected}
+            rotation={uiRotation}
+            cameraFrameTop={topMargin}
+            compositionTypeName={compositionType.displayName}
+          />
         </Pressable>
       </PinchGestureHandler>
 

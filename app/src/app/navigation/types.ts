@@ -13,6 +13,7 @@ export type RootStackParamList = {
   ImageViewer: {
     imageUri: string;
     allPhotos?: string[];
+    allPhotoIds?: string[];
     initialIndex?: number;
   };
 };

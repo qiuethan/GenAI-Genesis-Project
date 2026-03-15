@@ -8,6 +8,7 @@ interface Props {
   connected: boolean;
   rotation?: 0 | 90 | 180 | 270;
   cameraFrameTop: number;
+  compositionTypeName?: string | null;
 }
 
 const scoreToColor = (score: number): string => {
@@ -23,6 +24,7 @@ export const CompositionScoreOverlay: React.FC<Props> = ({
   connected,
   rotation = 0,
   cameraFrameTop,
+  compositionTypeName,
 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const hasShown = useRef(false);
@@ -75,9 +77,9 @@ export const CompositionScoreOverlay: React.FC<Props> = ({
                 )}
 
                 {/* Dominant pattern name */}
-                {result.dominant_pattern_name && (
+                {compositionTypeName && (
                   <Text style={styles.patternName}>
-                    {result.dominant_pattern_name}
+                    {compositionTypeName}
                   </Text>
                 )}
 

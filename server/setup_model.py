@@ -14,6 +14,9 @@ PLACES365_PATH = os.path.join(MODEL_DIR, "resnet18_places365.pth.tar")
 SAMP_URL = "https://www.dropbox.com/scl/fi/k1yuyhotuk9ky3m41iobg/samp_net.pth?rlkey=aoqqxv27wd5qqj3pytxki6vi3&st=0ffubx5d&dl=1"
 SAMP_PATH = os.path.join(MODEL_DIR, "samp_net.pth")
 
+# Composition classifier (ResNet-18, 11-class)
+COMP_CLASSIFIER_PATH = os.path.join(MODEL_DIR, "composition_classifier.pt")
+
 
 def _progress(block_num, block_size, total_size):
     downloaded = block_num * block_size

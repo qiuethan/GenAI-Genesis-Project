@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 import torch
 import torch.nn.functional as F
+import torchvision.models as models
 import torchvision.transforms as T
 
 from ..model.tanet import TANet
@@ -34,6 +35,15 @@ ATTRIBUTE_NAMES = [
     'Symmetry',
     'Repetition',
 ]
+
+# Model class -> app overlay type (only classes with overlays)
+COMP_CLASS_TO_OVERLAY = {
+    'rule_of_thirds': 'rule_of_thirds',
+    'symmetric': 'symmetry',
+    'diagonal': 'diagonals',
+    'golden_ratio': 'golden_ratio',
+    'triangle': 'triangles',
+}
 
 
 def _patch_adaptive_pool_for_mps():
@@ -67,6 +77,7 @@ class ImagePredictor:
 
     def __init__(self, checkpoint_path: str, places365_path: str,
                  samp_checkpoint_path: str | None = None,
+                 comp_classifier_path: str | None = None,
                  device: str = 'mps'):
         self.device = torch.device(device)
         self.image_size = 224
@@ -93,6 +104,20 @@ class ImagePredictor:
             self.samp_model.eval()
             print(f"[Predictor] SAMP-Net loaded on {self.device}")
 
+        # Composition classifier (ResNet-18, 11-class)
+        self.comp_classifier = None
+        self.comp_types: list[str] = []
+        if comp_classifier_path:
+            checkpoint = torch.load(comp_classifier_path, map_location='cpu', weights_only=False)
+            self.comp_types = checkpoint.get('comp_types', [])
+            num_classes = len(self.comp_types)
+            self.comp_classifier = models.resnet18(weights=None)
+            self.comp_classifier.fc = torch.nn.Linear(512, num_classes)
+            self.comp_classifier.load_state_dict(checkpoint['model_state_dict'])
+            self.comp_classifier.to(self.device)
+            self.comp_classifier.eval()
+            print(f"[Predictor] Composition classifier loaded on {self.device} ({num_classes} classes)")
+
         self.transform = T.Compose([
             T.ToPILImage(),
             T.Resize((self.image_size, self.image_size)),
@@ -115,6 +140,14 @@ class ImagePredictor:
         score = round(float(self.tanet(tensor).item()) * 100, 1)
         return {'aesthetic_score': score, 'score': score}
 
+    def _predict_composition_type(self, tensor: torch.Tensor) -> dict:
+        logits = self.comp_classifier(tensor)  # [1, num_classes]
+        probs = F.softmax(logits, dim=1)[0]
+        idx = int(probs.argmax().item())
+        raw_class = self.comp_types[idx]
+        app_type = COMP_CLASS_TO_OVERLAY.get(raw_class)
+        return {'composition_type': app_type}
+
     def _predict_samp(self, tensor: torch.Tensor, frame_bgr: np.ndarray) -> dict:
         # Compute saliency map
         sal_map = detect_saliency(frame_bgr)
@@ -127,10 +160,6 @@ class ImagePredictor:
         weighted_mean = float((scores[0] * levels).sum().item())
         composition_score = round((weighted_mean - 1) / 4 * 100, 1)
 
-        # Pattern weights (softmax applied)
-        pattern_weights = F.softmax(weight[0], dim=0).cpu().tolist() if weight is not None else []
-        dominant_pattern = int(torch.argmax(F.softmax(weight[0], dim=0)).item()) if weight is not None else 0
-
         # Attributes
         attributes = {}
         if attribute is not None:
@@ -140,9 +169,6 @@ class ImagePredictor:
         return {
             'composition_score': composition_score,
             'distribution': [round(float(s), 4) for s in scores[0].cpu().tolist()],
-            'pattern_weights': [round(float(w), 4) for w in pattern_weights],
-            'dominant_pattern': dominant_pattern,
-            'dominant_pattern_name': PATTERN_NAMES[dominant_pattern],
             'attributes': attributes,
         }
 
@@ -158,4 +184,43 @@ class ImagePredictor:
             samp_result = self._predict_samp(tensor, frame_bgr)
             result.update(samp_result)
 
+        # Composition type classification
+        if self.comp_classifier is not None:
+            comp_type_result = self._predict_composition_type(tensor)
+            result.update(comp_type_result)
+
         return result
+
+    @torch.no_grad()
+    def predict_batch(self, frames_bgr: list[np.ndarray]) -> list[dict]:
+        """Score multiple images. TANet runs as a single batch; SAMP-Net loops per image."""
+        if not frames_bgr:
+            return []
+
+        # Build batch tensor for TANet
+        tensors = [self._to_tensor(f) for f in frames_bgr]
+        batch = torch.cat(tensors, dim=0)  # [N, 3, 224, 224]
+
+        # TANet batch forward pass
+        tanet_scores = self.tanet(batch)  # [N, 1] or [N]
+        results: list[dict] = []
+        for i, s in enumerate(tanet_scores):
+            score = round(float(s.item()) * 100, 1)
+            results.append({'aesthetic_score': score, 'score': score})
+
+        # SAMP-Net per-image (needs individual saliency maps)
+        if self.samp_model is not None:
+            for i, frame in enumerate(frames_bgr):
+                samp_result = self._predict_samp(tensors[i], frame)
+                results[i].update(samp_result)
+
+        # Composition type classification (batch)
+        if self.comp_classifier is not None:
+            logits = self.comp_classifier(batch)  # [N, num_classes]
+            probs = F.softmax(logits, dim=1)
+            indices = probs.argmax(dim=1)
+            for i, idx in enumerate(indices):
+                raw_class = self.comp_types[int(idx.item())]
+                results[i]['composition_type'] = COMP_CLASS_TO_OVERLAY.get(raw_class)
+
+        return results

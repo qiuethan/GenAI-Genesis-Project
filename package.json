@@ -35,6 +35,7 @@
     "react-native-worklets-core": "^1.6.2"
   },
   "devDependencies": {
+    "@react-native-community/cli": "^20.1.2",
     "@types/react": "~19.1.0",
     "typescript": "~5.9.2"
   },
