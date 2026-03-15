@@ -16,6 +16,7 @@ import base64
 import io
 import json
 import os
+import threading
 import time
 import traceback
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -33,6 +34,7 @@ from .setup_model import TANET_PATH, PLACES365_PATH, SAMP_PATH, COMP_CLASSIFIER_
 # Global instances (initialized in main)
 _predictor: ImagePredictor | None = None
 _fastsam: FastSAM | None = None
+_gpu_lock = threading.Lock()
 
 
 def _decode_jpeg_with_exif(jpeg_bytes: bytes) -> np.ndarray:
@@ -102,7 +104,8 @@ class CompositionHandler(BaseHTTPRequestHandler):
 
         try:
             t0 = time.perf_counter()
-            result = _predictor.predict(frame)
+            with _gpu_lock:
+                result = _predictor.predict(frame)
             dt = time.perf_counter() - t0
 
             result['inference_ms'] = round(dt * 1000, 1)
@@ -135,7 +138,8 @@ class CompositionHandler(BaseHTTPRequestHandler):
         try:
             frame = _decode_jpeg_with_exif(jpeg_data)
             t0 = time.perf_counter()
-            result = _predictor.predict(frame)
+            with _gpu_lock:
+                result = _predictor.predict(frame)
             dt = time.perf_counter() - t0
 
             composition_type = result.get('composition_type')
@@ -194,7 +198,8 @@ class CompositionHandler(BaseHTTPRequestHandler):
 
         try:
             t0 = time.perf_counter()
-            result = _predictor.predict(frame)
+            with _gpu_lock:
+                result = _predictor.predict(frame)
             dt = time.perf_counter() - t0
             result['inference_ms'] = round(dt * 1000, 1)
             aes = result.get('aesthetic_score', '?')
@@ -226,7 +231,8 @@ class CompositionHandler(BaseHTTPRequestHandler):
             t0 = time.perf_counter()
             h, w = frame.shape[:2]
 
-            results = _fastsam(frame, verbose=False, conf=0.4, iou=0.9)
+            with _gpu_lock:
+                results = _fastsam(frame, verbose=False, conf=0.4, iou=0.9)
             r = results[0]
 
             rgba = np.zeros((h, w, 4), dtype=np.uint8)
@@ -308,10 +314,11 @@ class CompositionHandler(BaseHTTPRequestHandler):
 
         try:
             t0 = time.perf_counter()
-            if valid_frames:
-                batch_results = _predictor.predict_batch(valid_frames)
-            else:
-                batch_results = []
+            with _gpu_lock:
+                if valid_frames:
+                    batch_results = _predictor.predict_batch(valid_frames)
+                else:
+                    batch_results = []
             dt = time.perf_counter() - t0
 
             # Merge results back in order

@@ -36,8 +36,11 @@ export const useScanMode = (
   const baseUrl = useMemo(() => getServerUrl(), []);
   const cameraRefRef = useRef(cameraRef);
   cameraRefRef.current = cameraRef;
+  const aspectRatioRef = useRef(aspectRatio);
+  aspectRatioRef.current = aspectRatio;
 
   const rawFrames = useRef<string[]>([]);
+  const capturedFrames = useRef<{ uri: string; score: number; valid: boolean }[]>([]);
   const cancelledRef = useRef(false);
   const isCapturingRef = useRef(false);
   const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -113,8 +116,8 @@ export const useScanMode = (
       // Crop to match current aspect ratio
       const isPortrait = height > width;
       let targetRatio: number;
-      if (aspectRatio === '16:9') targetRatio = 16 / 9;
-      else if (aspectRatio === '1:1') targetRatio = 1;
+      if (aspectRatioRef.current === '16:9') targetRatio = 16 / 9;
+      else if (aspectRatioRef.current === '1:1') targetRatio = 1;
       else targetRatio = 4 / 3;
       const desiredRatio = isPortrait ? targetRatio : 1 / targetRatio;
       const currentRatio = height / width;
@@ -153,7 +156,7 @@ export const useScanMode = (
     } catch (e) {
       console.warn('[ScanMode] Edge detection failed:', e);
     }
-  }, [baseUrl, aspectRatio]);
+  }, [baseUrl]);
 
   const enterScanMode = useCallback(() => {
     setIsScanMode(true);
@@ -220,28 +223,26 @@ export const useScanMode = (
         if (!response.ok) return null;
         const data = await response.json();
 
+        const score = data.aesthetic_score ?? data.score ?? 0;
+
         // Object tracking is done on-device — we just need to know if they're still visible
         // The checkObjectsInFrame function is called from the component with live detections
         capturedFrames.current.push({
           uri,
-          score: data.aesthetic_score ?? data.score ?? 0,
+          score,
           valid: true, // will be updated by component via markLastFrameValid
         });
+
+        return { uri, score };
       } catch {
         return null;
       }
     };
 
-    const BATCH_SIZE = 3;
-    let count = 0;
-    for (let i = 0; i < frames.length; i += BATCH_SIZE) {
-      const batch = frames.slice(i, i + BATCH_SIZE);
-      const results = await Promise.all(batch.map(scoreFrame));
-      for (const r of results) {
-        if (r) scored.push(r);
-      }
-      count += batch.length;
-      setScoredCount(count);
+    for (let i = 0; i < frames.length; i++) {
+      const r = await scoreFrame(frames[i]);
+      if (r) scored.push(r);
+      setScoredCount(i + 1);
     }
 
     setIsProcessing(false);

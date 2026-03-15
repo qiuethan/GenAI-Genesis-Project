@@ -133,7 +133,7 @@ export const useShakeCoach = (config?: ShakeCoachConfig): {
       ...prev,
       debugMetrics,
     }));
-  }, [motion, cfg.enabled, cfg.triggerDelayMs, cfg.clearDelayMs]);
+  }, [motion.isShaking, motion.magnitude, motion.accelMagnitude, motion.gyroMagnitude, cfg.enabled, cfg.triggerDelayMs, cfg.clearDelayMs]);
 
   return { state };
 };
