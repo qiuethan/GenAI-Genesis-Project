@@ -33,6 +33,14 @@ export const useScanMode = (
   const [guideVisible, setGuideVisible] = useState(false);
   const [edgeGuideUri, setEdgeGuideUri] = useState<string | null>(null);
 
+  // Auto-swap to edge image when it arrives (handles the case where
+  // user entered guide mode before edge detection completed)
+  useEffect(() => {
+    if (edgeGuideUri && guideVisible) {
+      setGuideUri(edgeGuideUri);
+    }
+  }, [edgeGuideUri, guideVisible]);
+
   const baseUrl = useMemo(() => getServerUrl(), []);
   const cameraRefRef = useRef(cameraRef);
   cameraRefRef.current = cameraRef;

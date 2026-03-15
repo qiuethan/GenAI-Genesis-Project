@@ -242,12 +242,12 @@ class CompositionHandler(BaseHTTPRequestHandler):
                     mask_resized = cv2.resize(mask, (w, h), interpolation=cv2.INTER_LINEAR)
                     binary = (mask_resized > 0.5).astype(np.uint8)
                     contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                    cv2.drawContours(rgba, contours, -1, (0, 0, 0, 255), 3)
+                    cv2.drawContours(rgba, contours, -1, (0, 0, 0, 255), 2)
                 seg_count = len(r.masks)
 
             # Gaussian smoothing on the edge map to round out jagged contours
             alpha = rgba[:, :, 3]
-            alpha = cv2.GaussianBlur(alpha, (21, 21), 0)
+            alpha = cv2.GaussianBlur(alpha, (11, 11), 0)
             _, alpha = cv2.threshold(alpha, 80, 255, cv2.THRESH_BINARY)
             rgba[:, :, 3] = alpha
 

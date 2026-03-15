@@ -25,12 +25,12 @@ import { useDeviceOrientation } from '../../../infra/sensors/useDeviceOrientatio
 
 import { CaptureButton } from '../components/CaptureButton';
 import { CompositionPatternOverlay } from '../components/CompositionPatternOverlay';
+import { CompositionScoreOverlay } from '../components/CompositionScoreOverlay';
 import { IconButton } from '../components/IconButton';
 import { RotatableView } from '../components/RotatableView';
 import { ShutterFlash, ShutterFlashHandle } from '../components/ShutterFlash';
 import { CameraControlsMenu } from '../components/CameraControlsMenu';
 import { useTimer, useNightMode, useExposure, useFocus, useShakeCoach, useLevelCoach, useExposureCoach, useCompositionScore, scorePhoto, useScanMode, getAutoScoreEnabled, loadAutoScore } from '../hooks';
-import { useCompositionType } from '../hooks/useCompositionType';
 import { ShakeCoachOverlay } from '../components/ShakeCoachOverlay';
 import { LevelCoachOverlay } from '../components/LevelCoachOverlay';
 import { ExposureCoachOverlay } from '../components/ExposureCoachOverlay';
@@ -96,24 +96,29 @@ export const CameraScreen = () => {
   const scan = useScanMode(cameraRef, aspectRatio);
   const frameProcessor = analysisFrameProcessor;
 
-  // Use object detection frame processor during scan, analysis frame processor otherwise
-  const frameProcessor = scanActive
-    ? (objectDetection.frameProcessor ?? analysisFrameProcessor)
-    : analysisFrameProcessor;
-
   // Composition assessment via Mac server over USB
   const composition = useCompositionScore({
     cameraRef,
     aspectRatio,
-    enabled: isFocused && !scanActive && !scan.hasResult,
+    enabled: isFocused && !scan.isScanMode && !scan.isProcessing && !scan.hasResult,
   });
 
-  // Composition type classification via Gemini (every 5s)
-  const compositionType = useCompositionType({
-    cameraRef,
-    aspectRatio,
-    enabled: isFocused && !scanActive && !scan.hasResult,
-  });
+  // Composition type from /analyze result (bundled with scoring)
+  const DISPLAY_NAMES: Record<string, string> = {
+    rule_of_thirds: 'Rule of Thirds',
+    symmetric: 'Symmetric',
+    diagonal: 'Diagonal',
+    golden_ratio: 'Golden Ratio',
+    triangle: 'Triangle',
+    center: 'Center',
+    curved: 'Curved',
+    horizontal: 'Horizontal',
+    radial: 'Radial',
+    vanishing_point: 'Vanishing Point',
+    vertical: 'Vertical',
+  };
+  const compositionType = composition.result?.composition_type ?? null;
+  const compositionDisplayName = compositionType ? (DISPLAY_NAMES[compositionType] ?? compositionType) : null;
 
   // Mapping device orientation to UI rotation
   const uiRotation = orientation === 0 ? 0 : orientation === 180 ? 180 : orientation === 90 ? 90 : 270;
@@ -361,8 +366,8 @@ export const CameraScreen = () => {
             {/* Clear Middle with Grid */}
             <Animated.View style={{ height: animatedHeight, width: screenWidth, alignSelf: 'center' }}>
               <CompositionPatternOverlay
-                compositionType={compositionType.compositionType ?? undefined}
-                visible={!scanActive && compositionType.compositionType != null}
+                compositionType={compositionType ?? undefined}
+                visible={!scan.isScanMode && compositionType != null}
               />
             </Animated.View>
 
@@ -411,14 +416,7 @@ export const CameraScreen = () => {
           {scan.guideUri && scan.guideVisible && (
             <Image
               source={{ uri: scan.guideUri }}
-              style={{
-                position: 'absolute',
-                top: topMargin,
-                left: 0,
-                right: 0,
-                height: camHeight,
-                opacity: 1,
-              }}
+              style={[StyleSheet.absoluteFill, { opacity: 1 }]}
               resizeMode="cover"
               pointerEvents="none"
             />
@@ -430,7 +428,7 @@ export const CameraScreen = () => {
             connected={composition.connected}
             rotation={uiRotation}
             cameraFrameTop={topMargin}
-            compositionTypeName={compositionType.displayName}
+            compositionTypeName={compositionDisplayName}
           />
         </Pressable>
       </PinchGestureHandler>

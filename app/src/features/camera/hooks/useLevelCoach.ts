@@ -23,6 +23,7 @@ export const useLevelCoach = (): LevelCoachState => {
 
   const lastUpdate = useRef<number>(0);
   const smoothedAngleRef = useRef<number>(0);
+  const prevStateRef = useRef(state);
 
   useEffect(() => {
     // 50ms interval = 20Hz
@@ -39,11 +40,15 @@ export const useLevelCoach = (): LevelCoachState => {
 
       // Use utility to calculate tilt
       const { angle: rawAngleDeg, isFlat } = calculateHorizonTilt(gravity);
-      
+
       // Ignore if device is mostly flat (pointing down/up)
       if (isFlat) {
-        setState({ isLevel: true, angle: 0, hintText: null, isActive: false });
-        smoothedAngleRef.current = 0; // Reset smoothing
+        if (prevStateRef.current.isActive) {
+          const next = { isLevel: true, angle: 0, hintText: null, isActive: false };
+          prevStateRef.current = next;
+          setState(next);
+        }
+        smoothedAngleRef.current = 0;
         return;
       }
 
@@ -57,17 +62,23 @@ export const useLevelCoach = (): LevelCoachState => {
       // Coaching Zone: 2° < Tilt < 20°
       const showHint = absAngle > TILT_THRESHOLD && absAngle < MAX_TILT_THRESHOLD;
       const isLevel = absAngle <= TILT_THRESHOLD;
+      const hintText = showHint ? 'Level the phone' : null;
 
-      setState({
-        isLevel,
-        angle: smoothedAngle,
-        hintText: showHint ? 'Level the phone' : null,
-        isActive: true,
-      });
+      // Only setState when coaching state actually changes
+      const prev = prevStateRef.current;
+      if (prev.isLevel !== isLevel || prev.hintText !== hintText || !prev.isActive) {
+        const next = { isLevel, angle: smoothedAngle, hintText, isActive: true };
+        prevStateRef.current = next;
+        setState(next);
+      } else {
+        // Update angle in ref for LevelCoachOverlay reads, but don't re-render
+        prevStateRef.current = { ...prev, angle: smoothedAngle };
+      }
     });
 
     return () => subscription.remove();
   }, []);
 
-  return state;
+  // Return ref's angle (always fresh) merged with React state (for re-render triggers)
+  return { ...state, angle: prevStateRef.current.angle };
 };
