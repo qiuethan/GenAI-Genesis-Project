@@ -14,20 +14,26 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useGallery } from '../hooks';
 import { useAlbums, createAlbum, deleteAlbum } from '../hooks/useAlbums';
+import { useGalleryScores } from '../hooks/useGalleryScores';
 import { useAuth } from '../../auth/context/AuthContext';
 import { useUserProfile } from '../../../shared/hooks/useProfile';
 import { PhotoAsset } from '../../../infra/mediaLibrary';
 import { galleryStyles as styles } from '../styles/GalleryScreen.styles';
 import type { Album } from '../hooks/useAlbums';
 
-const CATEGORIES = [
-  'Rule Of Thirds',
-  'Leading Lines',
-  'Framing',
-  'Symmetry',
-  'Depth',
-  'Patterns',
-];
+const COMPOSITION_DISPLAY_NAMES: Record<string, string> = {
+  rule_of_thirds: 'Rule of Thirds',
+  symmetric: 'Symmetric',
+  diagonal: 'Diagonal',
+  golden_ratio: 'Golden Ratio',
+  triangle: 'Triangle',
+  center: 'Center',
+  curved: 'Curved',
+  horizontal: 'Horizontal',
+  radial: 'Radial',
+  vanishing_point: 'Vanishing Point',
+  vertical: 'Vertical',
+};
 
 interface DisplayAlbum {
   id: string;
@@ -41,6 +47,7 @@ export const GalleryScreen = () => {
   const insets = useSafeAreaInsets();
   const { photos, loading } = useGallery(100);
   const { albums, refresh: refreshAlbums } = useAlbums();
+  const { scores } = useGalleryScores();
   const { user } = useAuth();
   const { profile } = useUserProfile(user?.id);
 
@@ -90,13 +97,27 @@ export const GalleryScreen = () => {
     return result;
   }, [photos, albums, photoById]);
 
+  // Build composition categories from scored photos
   const categories = useMemo(() => {
-    if (photos.length === 0) return [];
-    return CATEGORIES.map((name, i) => ({
-      name,
-      coverUri: photos[i % photos.length]?.uri,
-    }));
-  }, [photos]);
+    const byType: Record<string, { photoIds: string[]; coverUri: string | null }> = {};
+    for (const photo of photos) {
+      const score = scores[photo.id];
+      if (!score?.composition_type) continue;
+      const type = score.composition_type;
+      if (!byType[type]) byType[type] = { photoIds: [], coverUri: null };
+      byType[type].photoIds.push(photo.id);
+      if (!byType[type].coverUri) byType[type].coverUri = photo.uri;
+    }
+    // Show all known types, populated ones first sorted by count, then empty ones
+    return Object.entries(COMPOSITION_DISPLAY_NAMES)
+      .map(([type, name]) => ({
+        type,
+        name,
+        coverUri: byType[type]?.coverUri ?? null,
+        count: byType[type]?.photoIds.length ?? 0,
+      }))
+      .sort((a, b) => b.count - a.count);
+  }, [photos, scores]);
 
   const handleAlbumPress = (album: DisplayAlbum) => {
     (navigation as any).navigate('AlbumDetail', {
@@ -159,7 +180,14 @@ export const GalleryScreen = () => {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerIconButton}>
             <Ionicons name="chevron-back" size={24} color="white" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Gallery</Text>
+          <View style={styles.headerTitleRow}>
+            <Image
+              source={require('../../../../assets/icon_transparent.png')}
+              style={styles.headerLogo}
+              contentFit="contain"
+            />
+            <Text style={styles.headerTitle}>Gallery</Text>
+          </View>
           <TouchableOpacity
             onPress={() => (navigation as any).navigate('ProfileTab')}
             style={styles.headerIconButton}
@@ -232,53 +260,51 @@ export const GalleryScreen = () => {
           )}
         />
 
-        {/* Categories */}
+        {/* Composition Categories */}
         <View style={[styles.sectionHeader, { marginTop: 24 }]}>
-          <Text style={styles.sectionTitle}>Composition Categories</Text>
+          <Text style={styles.sectionTitle}>Composition</Text>
         </View>
         <FlatList
           data={categories}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.categoryList}
-          keyExtractor={(item) => item.name}
+          keyExtractor={(item) => item.type}
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.categoryCard} activeOpacity={0.8}>
-              <Image
-                source={{ uri: item.coverUri }}
-                style={styles.categoryImage}
-                contentFit="cover"
-              />
+            <TouchableOpacity
+              style={[styles.categoryCard, item.count === 0 && { opacity: 0.4 }]}
+              activeOpacity={0.8}
+              disabled={item.count === 0}
+              onPress={() => (navigation as any).navigate('AlbumDetail', {
+                albumId: `__comp_${item.type}__`,
+                albumName: item.name,
+                compositionType: item.type,
+              })}
+            >
+              {item.coverUri ? (
+                <Image
+                  source={{ uri: item.coverUri }}
+                  style={styles.categoryImage}
+                  contentFit="cover"
+                />
+              ) : (
+                <View style={styles.albumPlaceholder}>
+                  <Ionicons name="grid-outline" size={36} color="#555" />
+                </View>
+              )}
               <View style={styles.categoryLabelContainer}>
                 <View style={styles.categoryLabel}>
                   <Text style={styles.categoryLabelText}>{item.name}</Text>
                 </View>
               </View>
+              {item.count > 0 && (
+                <View style={styles.albumCountContainer}>
+                  <Text style={styles.albumCountText}>{item.count}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           )}
         />
-
-        {/* Utilities */}
-        <View style={[styles.sectionHeader, { marginTop: 24 }]}>
-          <Text style={styles.sectionTitle}>Utilities</Text>
-        </View>
-        <View style={styles.utilitiesSection}>
-          <TouchableOpacity style={styles.utilityRow} activeOpacity={0.6}>
-            <View style={styles.utilityIconContainer}>
-              <Ionicons name="swap-vertical-outline" size={22} color="white" />
-            </View>
-            <Text style={styles.utilityLabel}>Imports</Text>
-            <Ionicons name="chevron-forward" size={20} color="#555" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.utilityRow} activeOpacity={0.6}>
-            <View style={styles.utilityIconContainer}>
-              <Ionicons name="trash-outline" size={22} color="white" />
-            </View>
-            <Text style={styles.utilityLabel}>Recently Deleted</Text>
-            <Ionicons name="chevron-forward" size={20} color="#555" />
-          </TouchableOpacity>
-        </View>
       </ScrollView>
     </View>
   );

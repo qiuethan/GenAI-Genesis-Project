@@ -22,7 +22,7 @@ export { useExposureCoach } from './useExposureCoach';
 export type { BlurCoachState, BlurCoachConfig, UseBlurCoachReturn } from './useBlurCoach';
 export { useCompositionScore } from './useCompositionScore';
 export type { CompositionResult, UseCompositionScoreConfig } from './useCompositionScore';
-export { useGalleryScores, scorePhoto, scorePhotoBatch, scoreToColor, cacheScore } from './useGalleryScores';
+export { useGalleryScores, scorePhoto, scorePhotoBatch, scoreToColor, cacheScore, removeScores } from './useGalleryScores';
 export type { GalleryScore } from './useGalleryScores';
 export { useAutoScore, getAutoScoreEnabled, loadAutoScore } from './useAutoScore';
 export { useScanMode } from './useScanMode';

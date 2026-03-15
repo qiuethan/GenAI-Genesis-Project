@@ -26,7 +26,6 @@ import { useDeviceOrientation } from '../../../infra/sensors/useDeviceOrientatio
 
 import { CaptureButton } from '../components/CaptureButton';
 import { CompositionPatternOverlay } from '../components/CompositionPatternOverlay';
-import { CompositionScoreOverlay } from '../components/CompositionScoreOverlay';
 import { IconButton } from '../components/IconButton';
 import { RotatableView } from '../components/RotatableView';
 import { ShutterFlash, ShutterFlashHandle } from '../components/ShutterFlash';
@@ -36,6 +35,7 @@ import { ShakeCoachOverlay } from '../components/ShakeCoachOverlay';
 import { LevelCoachOverlay } from '../components/LevelCoachOverlay';
 import { ExposureCoachOverlay } from '../components/ExposureCoachOverlay';
 import { ScanOverlay } from '../components/ScanOverlay';
+
 
 const scoreToColor = (score: number): string => {
   const t = Math.max(0, Math.min(1, score / 100));
@@ -53,6 +53,16 @@ export const CameraScreen = () => {
   const [lastPhoto, setLastPhoto] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [sceneBrightness, setSceneBrightness] = useState<number>(0.5);
+
+  // Grid overlay mode
+  type GridMode = 'off' | 'auto' | 'rule_of_thirds' | 'golden_ratio' | 'diagonal' | 'triangle' | 'symmetric';
+  const GRID_CYCLE: GridMode[] = ['off', 'auto', 'rule_of_thirds', 'golden_ratio', 'diagonal', 'triangle', 'symmetric'];
+  const GRID_LABELS: Record<GridMode, string> = {
+    off: 'Off', auto: 'Auto', rule_of_thirds: 'Thirds',
+    golden_ratio: 'Golden', diagonal: 'Diagonal', triangle: 'Triangle', symmetric: 'Symmetry',
+  };
+  const [gridMode, setGridMode] = useState<GridMode>('off');
+  const toggleGrid = () => setGridMode(m => GRID_CYCLE[(GRID_CYCLE.indexOf(m) + 1) % GRID_CYCLE.length]);
 
   // Camera control hooks
   const timer = useTimer();
@@ -105,7 +115,7 @@ export const CameraScreen = () => {
   const composition = useCompositionScore({
     cameraRef,
     aspectRatio,
-    enabled: isFocused && !scan.isScanMode && !scan.isProcessing && !scan.hasResult,
+    enabled: isFocused,
   });
 
   // Composition type from /analyze result (bundled with scoring)
@@ -124,6 +134,12 @@ export const CameraScreen = () => {
   };
   const compositionType = composition.result?.composition_type ?? null;
   const compositionDisplayName = compositionType ? (DISPLAY_NAMES[compositionType] ?? compositionType) : null;
+
+  // Resolve effective grid overlay type
+  const effectiveGridType = gridMode === 'off' ? undefined
+    : gridMode === 'auto' ? (compositionType ?? undefined)
+    : gridMode;
+  const gridVisible = gridMode !== 'off' && (gridMode !== 'auto' || compositionType != null);
 
   // Mapping device orientation to UI rotation
   const uiRotation = orientation === 0 ? 0 : orientation === 180 ? 180 : orientation === 90 ? 90 : 270;
@@ -365,8 +381,8 @@ export const CameraScreen = () => {
             {/* Clear Middle with Grid */}
             <Animated.View style={{ height: animatedHeight, width: screenWidth, alignSelf: 'center' }}>
               <CompositionPatternOverlay
-                compositionType={compositionType ?? undefined}
-                visible={!scan.isScanMode && compositionType != null}
+                compositionType={effectiveGridType}
+                visible={!scan.isScanMode && gridVisible}
               />
             </Animated.View>
 
@@ -431,14 +447,6 @@ export const CameraScreen = () => {
             </View>
           )}
 
-          {/* Composition Score Overlay */}
-          <CompositionScoreOverlay
-            result={composition.result}
-            connected={composition.connected}
-            rotation={uiRotation}
-            cameraFrameTop={topMargin}
-            compositionTypeName={compositionDisplayName}
-          />
         </Pressable>
       </PinchGestureHandler>
 
@@ -527,7 +535,7 @@ export const CameraScreen = () => {
         <View style={[styles.topRightRatio, { top: insets.top }]}>
           <View style={{ alignItems: 'center' }}>
             {/* Active settings above chevron */}
-            {!isMenuOpen && (exposureControl.exposure !== 0 || nightMode.nightMode !== 'off' || timer.timerDuration > 0) && (
+            {!isMenuOpen && (exposureControl.exposure !== 0 || nightMode.nightMode !== 'off' || timer.timerDuration > 0 || gridMode !== 'off') && (
               <View style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
                 {timer.timerDuration > 0 && (
                   <Text style={{ color: '#ffe81f', fontSize: 11, fontWeight: '600' }}>{timer.timerDuration}s</Text>
@@ -539,6 +547,9 @@ export const CameraScreen = () => {
                   <Text style={{ color: '#ffe81f', fontSize: 11, fontWeight: '600' }}>
                     {exposureControl.exposure > 0 ? '+' : ''}{exposureControl.exposure}
                   </Text>
+                )}
+                {gridMode !== 'off' && (
+                  <Ionicons name="grid" size={11} color="#ffe81f" />
                 )}
               </View>
             )}
@@ -570,6 +581,9 @@ export const CameraScreen = () => {
               onNightModePress={nightMode.cycleNightMode}
               exposure={exposureControl.exposure}
               onExposurePress={exposureControl.cycleExposure}
+              gridMode={gridMode}
+              gridLabel={GRID_LABELS[gridMode]}
+              onGridPress={toggleGrid}
            />
          </View>
       )}

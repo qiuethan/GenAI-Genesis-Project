@@ -211,7 +211,7 @@ class CompositionHandler(BaseHTTPRequestHandler):
             result = _predictor.predict(frame)
             dt_model = time.perf_counter() - t0
 
-            composition_type = result.get('dominant_pattern_name', 'Rule of Thirds')
+            composition_type = result.get('composition_type', result.get('dominant_pattern_name', 'Rule of Thirds'))
 
             # Re-encode frame as JPEG for Gemini
             _, jpeg_buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
@@ -231,6 +231,7 @@ class CompositionHandler(BaseHTTPRequestHandler):
                 'composition_type': composition_type,
                 'aesthetic_score': result.get('aesthetic_score'),
                 'composition_score': result.get('composition_score'),
+                'distribution': result.get('distribution'),
                 'attributes': result.get('attributes', {}),
                 'model_ms': round(dt_model * 1000, 1),
                 'gemini_ms': round(dt_gemini * 1000, 1),

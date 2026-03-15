@@ -9,6 +9,7 @@ import {
   RefreshControl,
   Dimensions,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect, CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -136,7 +137,14 @@ export function HomeScreen() {
   const renderHeader = () => (
     <View>
       <View style={styles.appHeader}>
-        <Text style={styles.appTitle}>Frame</Text>
+        <View style={styles.appTitleRow}>
+          <ExpoImage
+            source={require('../../../../assets/icon_transparent.png')}
+            style={styles.appLogo}
+            contentFit="contain"
+          />
+          <Text style={styles.appTitle}>Frame</Text>
+        </View>
         <TouchableOpacity
           onPress={() => navigation.navigate('UserSearch')}
           style={styles.searchIconBtn}
@@ -224,6 +232,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
+  },
+  appTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  appLogo: {
+    width: 30,
+    height: 30,
   },
   appTitle: {
     fontSize: 28,

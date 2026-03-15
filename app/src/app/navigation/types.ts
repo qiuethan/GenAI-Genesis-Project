@@ -49,6 +49,7 @@ export type CameraStackParamList = {
   AlbumDetail: {
     albumId: string;
     albumName: string;
+    compositionType?: string;
   };
   PhotoPicker: {
     albumId: string;

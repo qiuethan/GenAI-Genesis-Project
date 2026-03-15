@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Dimensions,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as MediaLibrary from 'expo-media-library';
 import { useGallery } from '../hooks';
 import { useAlbums, addPhotosToAlbum, removePhotosFromAlbum } from '../hooks/useAlbums';
-import { useGalleryScores } from '../hooks/useGalleryScores';
+import { useGalleryScores, scorePhoto, scorePhotoBatch, removeScores } from '../hooks/useGalleryScores';
 import { PhotoAsset } from '../../../infra/mediaLibrary';
 
 const { width } = Dimensions.get('window');
@@ -27,23 +28,28 @@ export const AlbumDetailScreen = () => {
   const navigation = useNavigation();
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
-  const { albumId, albumName } = route.params as { albumId: string; albumName: string };
+  const { albumId, albumName, compositionType } = route.params as { albumId: string; albumName: string; compositionType?: string };
   const { photos } = useGallery(100);
   const { albums, refresh } = useAlbums();
 
   const { scores } = useGalleryScores();
   const [selecting, setSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [scoringIds, setScoringIds] = useState<Set<string>>(new Set());
 
   const album = albums.find((a) => a.id === albumId);
   const photoIdSet = useMemo(() => new Set(album?.photoIds ?? []), [album?.photoIds]);
 
   // "All Photos" is a virtual album showing everything
   const isAllPhotos = albumId === '__all__';
+  const isCompositionFilter = !!compositionType;
   const albumPhotos = useMemo(() => {
     if (isAllPhotos) return photos;
+    if (isCompositionFilter) {
+      return photos.filter((p) => scores[p.id]?.composition_type === compositionType);
+    }
     return photos.filter((p) => photoIdSet.has(p.id));
-  }, [isAllPhotos, photos, photoIdSet]);
+  }, [isAllPhotos, isCompositionFilter, photos, photoIdSet, scores, compositionType]);
 
   const handlePhotoPress = (photo: PhotoAsset, index: number) => {
     if (selecting) {
@@ -104,6 +110,7 @@ export const AlbumDetailScreen = () => {
           if (isAllPhotos) {
             try {
               await MediaLibrary.deleteAssetsAsync(ids);
+              await removeScores(ids);
             } catch {}
           } else {
             await removePhotosFromAlbum(albumId, ids);
@@ -112,6 +119,25 @@ export const AlbumDetailScreen = () => {
         },
       },
     ]);
+  };
+
+  const handleScoreSelected = async () => {
+    if (selectedIds.size === 0) return;
+    const toScore = albumPhotos.filter((p) => selectedIds.has(p.id));
+    setScoringIds(new Set(toScore.map((p) => p.id)));
+    handleCancelSelect();
+    await scorePhotoBatch(toScore.map((p) => ({ id: p.id, uri: p.uri })));
+    setScoringIds(new Set());
+  };
+
+  const handleScoreSingle = async (photo: PhotoAsset) => {
+    setScoringIds((prev) => new Set(prev).add(photo.id));
+    await scorePhoto(photo.id, photo.uri);
+    setScoringIds((prev) => {
+      const next = new Set(prev);
+      next.delete(photo.id);
+      return next;
+    });
   };
 
   const badgeColor = (score: number): string => {
@@ -138,11 +164,26 @@ export const AlbumDetailScreen = () => {
       >
         <Image source={{ uri: item.uri }} style={gridStyles.photoImage} contentFit="cover" />
         {!selecting && photoScore && (
-          <View style={gridStyles.scoreBadge}>
-            <Text style={[gridStyles.scoreBadgeText, { color: badgeColor(photoScore.aesthetic_score) }]}>
-              {Math.round(photoScore.aesthetic_score)}
+          <View style={[gridStyles.scorePill, { backgroundColor: badgeColor(photoScore.combined_score) }]}>
+            <Text style={gridStyles.scorePillText}>
+              {Math.round(photoScore.combined_score)}
             </Text>
           </View>
+        )}
+        {!selecting && !photoScore && (
+          scoringIds.has(item.id) ? (
+            <View style={gridStyles.scorePill}>
+              <ActivityIndicator size={8} color="#aaa" />
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={gridStyles.scorePill}
+              onPress={() => handleScoreSingle(item)}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Ionicons name="sparkles" size={10} color="#888" />
+            </TouchableOpacity>
+          )
         )}
         {selecting && (
           <View style={gridStyles.selectOverlay}>
@@ -190,7 +231,7 @@ export const AlbumDetailScreen = () => {
                 {isAllPhotos ? 'All Photos' : albumName}
               </Text>
               <View style={gridStyles.headerRight}>
-                {!isAllPhotos && (
+                {!isAllPhotos && !isCompositionFilter && (
                   <TouchableOpacity onPress={handleAddPhotos} style={gridStyles.iconButton}>
                     <Ionicons name="add" size={26} color="white" />
                   </TouchableOpacity>
@@ -222,8 +263,10 @@ export const AlbumDetailScreen = () => {
         ListEmptyComponent={
           <View style={gridStyles.emptyContainer}>
             <Ionicons name="images-outline" size={48} color="#555" />
-            <Text style={gridStyles.emptyText}>No photos in this album</Text>
-            {!isAllPhotos && (
+            <Text style={gridStyles.emptyText}>
+              {isCompositionFilter ? 'No photos with this composition' : 'No photos in this album'}
+            </Text>
+            {!isAllPhotos && !isCompositionFilter && (
               <TouchableOpacity style={gridStyles.emptyAddButton} onPress={handleAddPhotos}>
                 <Text style={gridStyles.emptyAddText}>Add Photos</Text>
               </TouchableOpacity>
@@ -237,8 +280,22 @@ export const AlbumDetailScreen = () => {
         <View style={[gridStyles.toolbar, { paddingBottom: insets.bottom + 10 }]}>
           <TouchableOpacity
             style={[
-              gridStyles.trashButton,
-              selectedIds.size === 0 && gridStyles.trashButtonDisabled,
+              gridStyles.toolbarButton,
+              selectedIds.size === 0 && gridStyles.toolbarButtonDisabled,
+            ]}
+            onPress={handleScoreSelected}
+            disabled={selectedIds.size === 0}
+          >
+            <Ionicons
+              name="sparkles-outline"
+              size={20}
+              color={selectedIds.size === 0 ? '#555' : '#4a9eff'}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              gridStyles.toolbarButton,
+              selectedIds.size === 0 && gridStyles.toolbarButtonDisabled,
             ]}
             onPress={handleDeleteSelected}
             disabled={selectedIds.size === 0}
@@ -329,18 +386,22 @@ const gridStyles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  scoreBadge: {
+  scorePill: {
     position: 'absolute',
     bottom: 4,
-    left: 4,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    right: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     borderRadius: 8,
+    minWidth: 24,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 5,
-    paddingVertical: 2,
   },
-  scoreBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
+  scorePillText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
   },
   selectOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -371,15 +432,16 @@ const gridStyles = StyleSheet.create({
     borderTopColor: '#333',
     flexDirection: 'row',
     justifyContent: 'center',
+    gap: 40,
     paddingTop: 10,
   },
-  trashButton: {
+  toolbarButton: {
     width: 40,
     height: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  trashButtonDisabled: {
+  toolbarButtonDisabled: {
     opacity: 0.4,
   },
   emptyContainer: {

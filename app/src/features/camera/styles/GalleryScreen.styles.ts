@@ -61,12 +61,21 @@ export const galleryStyles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
-  headerTitle: {
+  headerTitleRow: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  headerLogo: {
+    width: 24,
+    height: 24,
+  },
+  headerTitle: {
     color: 'white',
     fontSize: 18,
     fontWeight: '700',
-    textAlign: 'center',
   },
 
   // Section header
@@ -176,33 +185,6 @@ export const galleryStyles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Utilities
-  utilitiesSection: {
-    paddingHorizontal: SECTION_PADDING,
-    marginTop: 8,
-  },
-  utilityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-  },
-  utilityIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: '#1a2030',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 170, 0, 0.3)',
-  },
-  utilityLabel: {
-    flex: 1,
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '500',
-  },
 });
 
 export const GALLERY_CONSTANTS = {

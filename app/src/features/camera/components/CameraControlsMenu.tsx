@@ -46,6 +46,10 @@ interface Props {
   // Exposure
   exposure: ExposureValue;
   onExposurePress: () => void;
+  // Grid
+  gridMode: string;
+  gridLabel: string;
+  onGridPress: () => void;
 }
 
 export const CameraControlsMenu = ({
@@ -58,6 +62,9 @@ export const CameraControlsMenu = ({
   onNightModePress,
   exposure,
   onExposurePress,
+  gridMode,
+  gridLabel,
+  onGridPress,
 }: Props) => {
   if (!isOpen) return null;
 
@@ -108,11 +115,18 @@ export const CameraControlsMenu = ({
           onPress={onNightModePress}
         />
 
-        <ControlItem 
-          icon="aperture" 
+        <ControlItem
+          icon="aperture"
           label={getExposureLabel()}
           isActive={exposure !== 0}
           onPress={onExposurePress}
+        />
+
+        <ControlItem
+          icon={gridMode === 'off' ? 'grid-outline' : 'grid'}
+          label={gridMode !== 'off' ? gridLabel : undefined}
+          isActive={gridMode !== 'off'}
+          onPress={onGridPress}
         />
       </ScrollView>
     </View>
