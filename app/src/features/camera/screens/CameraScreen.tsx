@@ -58,7 +58,7 @@ export const CameraScreen = () => {
   const navigation = useNavigation();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const device = useSelfCameraDevice(position);
-  const { zoom, config: zoomConfig, setZoom, onPinchBegan, onPinchUpdate, onPinchEnd, isPinching } = useZoom(device);
+  const { zoom, zoomShared, config: zoomConfig, setZoom, onPinchBegan, onPinchUpdate, onPinchEnd, isPinching } = useZoom(device);
 
   const analysisFrameProcessor = useAnalysisFrameProcessor({
     onExposureMetrics: exposureCoach.onMetrics,
@@ -293,16 +293,16 @@ export const CameraScreen = () => {
           }}
         >
           {device ? (
-            <CameraView 
-              ref={cameraRef} 
-              device={device} 
-              isActive={true} 
-              zoom={zoom}
-                          torch={flash === 'torch' ? 'on' : 'off'}
-                          exposure={exposureControl.exposure / 2}
-                          lowLightBoost={nightMode.nightMode !== 'off'}
-                          frameProcessor={frameProcessor}
-                        />          ) : (
+            <CameraView
+              ref={cameraRef}
+              device={device}
+              isActive={true}
+              zoom={zoomShared}
+              torch={flash === 'torch' ? 'on' : 'off'}
+              exposure={exposureControl.exposure / 2}
+              lowLightBoost={nightMode.nightMode !== 'off'}
+              frameProcessor={frameProcessor}
+            />          ) : (
             <View style={styles.center}>
                <Text style={styles.text}>No Device ({position})</Text>
             </View>
