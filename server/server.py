@@ -17,6 +17,7 @@ import io
 import json
 import os
 import time
+import traceback
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 
@@ -27,12 +28,10 @@ import numpy as np
 from ultralytics import FastSAM
 
 from .inference.predictor import ImagePredictor
-from .inference.detector import ObjectDetector
 from .setup_model import TANET_PATH, PLACES365_PATH, SAMP_PATH, COMP_CLASSIFIER_PATH
 
 # Global instances (initialized in main)
 _predictor: ImagePredictor | None = None
-_detector: ObjectDetector | None = None
 _fastsam: FastSAM | None = None
 
 
@@ -68,8 +67,6 @@ class CompositionHandler(BaseHTTPRequestHandler):
             return self._handle_score()
         if self.path == '/score-batch':
             return self._handle_score_batch()
-        if self.path == '/scan':
-            return self._handle_scan()
         if self.path == '/classify-composition':
             return self._handle_classify_composition()
         if self.path == '/analyze-composition':
@@ -120,14 +117,15 @@ class CompositionHandler(BaseHTTPRequestHandler):
             cv2.imwrite(os.path.join(debug_dir, filename), frame)
 
             comp = result.get('composition_score', '?')
-            print(f"[Analyze] {frame.shape[1]}x{frame.shape[0]} -> aesthetic={aes} comp={comp} in {result['inference_ms']:.0f}ms")
+            ctype = result.get('composition_type', '?')
+            print(f"[Analyze] {frame.shape[1]}x{frame.shape[0]} -> aesthetic={aes} comp={comp} type={ctype} in {result['inference_ms']:.0f}ms")
             self._json_response(200, result)
         except Exception as e:
             print(f"[Analyze] ERROR: {e}")
             self._json_response(500, {'error': str(e)})
 
     def _handle_classify_composition(self):
-        """Classify composition technique via Gemini text model (~450ms)."""
+        """Classify composition technique using local ResNet-18 model."""
         content_length = int(self.headers.get('Content-Length', 0))
         if content_length == 0:
             self._json_response(400, {'error': 'empty body'})
@@ -135,16 +133,12 @@ class CompositionHandler(BaseHTTPRequestHandler):
 
         jpeg_data = self.rfile.read(content_length)
         try:
-            from .inference.gemini import classify_composition
-
+            frame = _decode_jpeg_with_exif(jpeg_data)
             t0 = time.perf_counter()
-            composition_type = classify_composition(jpeg_data)
+            result = _predictor.predict(frame)
             dt = time.perf_counter() - t0
 
-            if composition_type is None:
-                self._json_response(200, {'composition_type': None, 'classify_ms': round(dt * 1000, 1)})
-                return
-
+            composition_type = result.get('composition_type')
             print(f"[Classify] {composition_type} in {dt*1000:.0f}ms")
             self._json_response(200, {
                 'composition_type': composition_type,
@@ -152,53 +146,6 @@ class CompositionHandler(BaseHTTPRequestHandler):
             })
         except Exception as e:
             print(f"[Classify] ERROR: {e}")
-            self._json_response(500, {'error': str(e)})
-
-    def _handle_detect(self):
-        """Detect all objects in a frame using YOLO. Used when entering scan mode."""
-        content_length = int(self.headers.get('Content-Length', 0))
-        if content_length == 0:
-            self._json_response(400, {'error': 'empty body'})
-            return
-
-        jpeg_data = self.rfile.read(content_length)
-        try:
-            frame = _decode_jpeg_with_exif(jpeg_data)
-        except Exception:
-            self._json_response(400, {'error': 'invalid image'})
-            return
-
-        try:
-            jpeg_data = self.rfile.read(content_length)
-            frame = _decode_jpeg_with_exif(jpeg_data)
-
-            # Parse target objects from query string
-            from urllib.parse import urlparse, parse_qs
-            query = parse_qs(urlparse(self.path).query)
-            targets_json = query.get('targets', ['[]'])[0]
-            import json
-            targets = json.loads(targets_json)
-
-            # Check if all target objects are in frame
-            check = _detector.check_objects_in_frame(frame, targets)
-
-            # Score the frame
-            score_result = _predictor.predict(frame)
-
-            aes = score_result.get('aesthetic_score', '?')
-            comp = score_result.get('composition_score', '?')
-            pattern = score_result.get('dominant_pattern_name', '?')
-            print(f"[Scan] {frame.shape[1]}x{frame.shape[0]} -> aesthetic={aes} comp={comp} pattern={pattern} objects_found={check['all_found']} missing={check['missing']}")
-
-            self._json_response(200, {
-                'aesthetic_score': score_result['aesthetic_score'],
-                'score': score_result['score'],
-                'all_objects_found': check['all_found'],
-                'found_objects': check['found_objects'],
-                'missing': check['missing'],
-            })
-        except Exception as e:
-            print(f"[Scan] ERROR: {e}")
             self._json_response(500, {'error': str(e)})
 
     def _handle_analyze_composition(self):
@@ -228,7 +175,7 @@ class CompositionHandler(BaseHTTPRequestHandler):
                 'gemini_ms': round(dt * 1000, 1),
             })
         except Exception as e:
-            print(f"[AnalyzeComp] ERROR: {e}")
+            traceback.print_exc()
             self._json_response(500, {'error': str(e)})
 
     def _handle_score(self):
@@ -400,7 +347,7 @@ class CompositionHandler(BaseHTTPRequestHandler):
 
 
 def main():
-    global _predictor
+    global _predictor, _fastsam
 
     parser = argparse.ArgumentParser(description="Image assessment HTTP server")
     parser.add_argument("--port", type=int, default=8420, help="Port (default: 8420)")
@@ -420,7 +367,6 @@ def main():
 
     # Load models
     _predictor = ImagePredictor(TANET_PATH, PLACES365_PATH, samp_checkpoint_path=SAMP_PATH, comp_classifier_path=COMP_CLASSIFIER_PATH, device=device)
-    _detector = ObjectDetector(device=device)
     _fastsam = FastSAM('FastSAM-s.pt')
     print(f"[Server] FastSAM-s loaded")
 

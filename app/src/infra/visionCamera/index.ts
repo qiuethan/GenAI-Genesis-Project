@@ -22,5 +22,3 @@ export type { ZoomConfig, ZoomStop } from './zoom';
 export { useBlurFrameProcessor } from './useBlurFrameProcessor';
 export { useAnalysisFrameProcessor } from './useAnalysisFrameProcessor';
 export { useExposureFrameProcessor } from './useExposureFrameProcessor';
-export { useObjectDetection } from './useObjectDetection';
-export type { Detection } from './useObjectDetection';
