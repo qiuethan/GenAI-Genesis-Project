@@ -25,5 +25,7 @@ export type { CompositionResult, UseCompositionScoreConfig } from './useComposit
 export { useGalleryScores, scorePhoto, scorePhotoBatch, scoreToColor, cacheScore } from './useGalleryScores';
 export type { GalleryScore } from './useGalleryScores';
 export { useAutoScore, getAutoScoreEnabled, loadAutoScore } from './useAutoScore';
+export { useCompositionScore } from './useCompositionScore';
+export type { CompositionResult, UseCompositionScoreConfig } from './useCompositionScore';
 export { useScanMode } from './useScanMode';
 export type { ScanResult } from './useScanMode';

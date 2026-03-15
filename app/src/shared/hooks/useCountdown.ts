@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 interface CountdownResult {
+  days: number;
   hours: number;
   minutes: number;
   seconds: number;
@@ -17,7 +18,7 @@ export function useCountdown(targetDate: string | undefined): CountdownResult {
   }, []);
 
   if (!targetDate) {
-    return { hours: 0, minutes: 0, seconds: 0, isExpired: true, formatted: '00:00:00' };
+    return { days: 0, hours: 0, minutes: 0, seconds: 0, isExpired: true, formatted: '00:00:00' };
   }
 
   const target = new Date(targetDate).getTime();
@@ -25,12 +26,15 @@ export function useCountdown(targetDate: string | undefined): CountdownResult {
   const isExpired = diff === 0;
 
   const totalSeconds = Math.floor(diff / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
 
   const pad = (n: number) => n.toString().padStart(2, '0');
-  const formatted = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+  const formatted = days > 0
+    ? `${days}d ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
+    : `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
 
-  return { hours, minutes, seconds, isExpired, formatted };
+  return { days, hours, minutes, seconds, isExpired, formatted };
 }

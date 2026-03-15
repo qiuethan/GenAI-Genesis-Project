@@ -68,11 +68,8 @@ export const CoachingHint: React.FC<CoachingHintProps> = ({
   };
 
   if (rotation === 0 || rotation === 180) {
-    // Portrait: Position just above zoom buttons
-    // Zoom buttons are at: cameraFrameTop + cameraFrameHeight - 50
-    // Position hint ~40px above zoom buttons => -90
-    // Apply stack offset (moving up)
-    containerStyle.top = cameraFrameTop + cameraFrameHeight - 90 - verticalOffset;
+    // Portrait: Position below the top bar
+    containerStyle.top = cameraFrameTop + 60 + verticalOffset;
     containerStyle.left = 0;
     containerStyle.right = 0;
     containerStyle.alignItems = 'center';

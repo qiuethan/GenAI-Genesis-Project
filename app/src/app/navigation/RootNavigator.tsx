@@ -34,9 +34,15 @@ export const RootNavigator = () => {
           const iconName = focused ? icons.focused : icons.default;
 
           if (route.name === 'CameraTab') {
+            if (focused) {
+              return <Ionicons name={iconName} size={size} color={color} />;
+            }
             return (
-              <View style={styles.cameraIconContainer}>
-                <Ionicons name={iconName} size={28} color="#000" />
+              <View style={styles.cameraBumpWrapper}>
+                <View style={styles.cameraBump} />
+                <View style={styles.cameraIconContainer}>
+                  <Ionicons name={iconName} size={28} color="#000" />
+                </View>
               </View>
             );
           }
@@ -87,6 +93,18 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
   },
+  cameraBumpWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -12,
+  },
+  cameraBump: {
+    position: 'absolute',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#000',
+  },
   cameraIconContainer: {
     width: 48,
     height: 48,
@@ -94,6 +112,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 4,
   },
 });

@@ -174,11 +174,10 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 4,
+    paddingVertical: 12,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '800',
     color: '#fff',
     letterSpacing: -0.5,

@@ -37,9 +37,6 @@ interface Props {
   // Flash
   flashMode: 'off' | 'on' | 'auto' | 'torch';
   onFlashPress: () => void;
-  // Aspect Ratio
-  aspectRatio: '4:3' | '16:9' | '1:1';
-  onAspectRatioPress: () => void;
   // Timer
   timerDuration: TimerDuration;
   onTimerPress: () => void;
@@ -55,8 +52,6 @@ export const CameraControlsMenu = ({
   isOpen,
   flashMode,
   onFlashPress,
-  aspectRatio,
-  onAspectRatioPress,
   timerDuration,
   onTimerPress,
   nightMode,
@@ -99,13 +94,7 @@ export const CameraControlsMenu = ({
           onPress={onFlashPress}
         />
         
-        <TextControlItem 
-          text={aspectRatio} 
-          onPress={onAspectRatioPress}
-          isActive={true}
-        />
-
-        <ControlItem 
+        <ControlItem
           icon="timer" 
           label={getTimerLabel()}
           isActive={timerDuration > 0}

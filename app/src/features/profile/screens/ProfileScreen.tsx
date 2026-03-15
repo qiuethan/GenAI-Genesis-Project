@@ -11,6 +11,7 @@ import {
   Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../auth/context/AuthContext';
 import {
@@ -20,6 +21,7 @@ import {
   useUserPodiums,
 } from '../../../shared/hooks/useProfile';
 import { COMPOSITION_LABELS } from '../../../shared/types/database';
+import { computeAndAwardBadge } from '../../../shared/services/badgeService';
 import { ProfileHeaderSkeleton } from '../../../shared/components/Skeleton';
 import type { Submission } from '../../../shared/types/database';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -36,7 +38,7 @@ type Props = {
   navigation: NativeStackNavigationProp<ProfileStackParamList, 'Profile'>;
 };
 
-function PhotoGrid({ submissions }: { submissions: Submission[] }) {
+function PhotoGrid({ submissions, onPressPhoto }: { submissions: Submission[]; onPressPhoto?: (uri: string) => void }) {
   if (submissions.length === 0) {
     return (
       <View style={styles.emptyTab}>
@@ -49,12 +51,13 @@ function PhotoGrid({ submissions }: { submissions: Submission[] }) {
   return (
     <View style={styles.grid}>
       {submissions.map((s) => (
-        <Image
-          key={s.id}
-          source={{ uri: s.photo_url }}
-          style={styles.gridItem}
-          resizeMode="cover"
-        />
+        <TouchableOpacity key={s.id} activeOpacity={0.8} onPress={() => onPressPhoto?.(s.photo_url)}>
+          <Image
+            source={{ uri: s.photo_url }}
+            style={styles.gridItem}
+            resizeMode="cover"
+          />
+        </TouchableOpacity>
       ))}
     </View>
   );
@@ -114,6 +117,22 @@ function ChallengeHistory({
   );
 }
 
+const TROPHY_COLORS: Record<number, { trophy: string; bg: string; rank: string }> = {
+  1: { trophy: '#FFD700', bg: 'rgba(255, 215, 0, 0.12)', rank: '#FFD700' },
+  2: { trophy: '#C0C0C0', bg: 'rgba(192, 192, 192, 0.10)', rank: '#C0C0C0' },
+  3: { trophy: '#CD7F32', bg: 'rgba(205, 127, 50, 0.10)', rank: '#CD7F32' },
+};
+
+function RankTrophy({ rank }: { rank: number }) {
+  const colors = TROPHY_COLORS[rank] ?? TROPHY_COLORS[3];
+  return (
+    <View style={[podiumStyles.trophyContainer, { backgroundColor: colors.bg }]}>
+      <Ionicons name="trophy" size={18} color={colors.trophy} />
+      <Text style={[podiumStyles.trophyRank, { color: colors.rank }]}>{rank}</Text>
+    </View>
+  );
+}
+
 function PodiumList({
   podiums,
   onPressEntry,
@@ -124,13 +143,11 @@ function PodiumList({
   if (podiums.length === 0) {
     return (
       <View style={styles.emptyTab}>
-        <Ionicons name="medal-outline" size={32} color="#333" />
+        <Ionicons name="trophy-outline" size={32} color="#333" />
         <Text style={styles.emptyTabText}>No podium finishes yet</Text>
       </View>
     );
   }
-
-  const medals = ['🥇', '🥈', '🥉'];
 
   return (
     <View style={styles.listContainer}>
@@ -141,7 +158,7 @@ function PodiumList({
           onPress={() => onPressEntry?.(entry, index)}
           activeOpacity={0.7}
         >
-          <Text style={styles.podiumMedal}>{medals[(entry.rank ?? 1) - 1] ?? ''}</Text>
+          <RankTrophy rank={entry.rank ?? 1} />
           <Image
             source={{ uri: entry.photo_url }}
             style={styles.historyThumb}
@@ -189,6 +206,15 @@ export function ProfileScreen({ navigation }: Props) {
     refetchPodiums();
   }, [refetchProfile, refetchPhotos, refetchHistory, refetchPodiums]);
 
+  useFocusEffect(
+    useCallback(() => {
+      handleRefresh();
+      if (user?.id) {
+        computeAndAwardBadge(user.id).catch(() => {});
+      }
+    }, [handleRefresh, user?.id])
+  );
+
   const tabs: { key: Tab; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
     { key: 'photos', label: 'Photos', icon: 'grid-outline' },
     { key: 'challenges', label: 'Challenges', icon: 'trophy-outline' },
@@ -232,7 +258,7 @@ export function ProfileScreen({ navigation }: Props) {
 
         {profile?.composition_badge && (
           <View style={styles.badge}>
-            <Text style={styles.badgeText}>◈ {profile.composition_badge}</Text>
+            <Text style={styles.badgeText}>◈ Best at {profile.composition_badge}</Text>
           </View>
         )}
 
@@ -292,13 +318,13 @@ export function ProfileScreen({ navigation }: Props) {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'photos':
-        return <PhotoGrid submissions={submissions} />;
+        return <PhotoGrid submissions={submissions} onPressPhoto={(uri) => navigation.navigate('PhotoViewer', { uri })} />;
       case 'challenges':
         return (
           <ChallengeHistory
             entries={entries}
-            onPressEntry={(_, index) =>
-              openPhotoViewer(entries.map((e) => e.photo_url), index)
+            onPressEntry={(entry) =>
+              navigation.navigate('ChallengeDetail', { challengeId: entry.challenge_id })
             }
           />
         );
@@ -306,8 +332,8 @@ export function ProfileScreen({ navigation }: Props) {
         return (
           <PodiumList
             podiums={podiums}
-            onPressEntry={(_, index) =>
-              openPhotoViewer(podiums.map((e) => e.photo_url), index)
+            onPressEntry={(entry) =>
+              navigation.navigate('ChallengeDetail', { challengeId: entry.challenge_id })
             }
           />
         );
@@ -556,9 +582,6 @@ const styles = StyleSheet.create({
     color: '#888',
     marginTop: 2,
   },
-  podiumMedal: {
-    fontSize: 24,
-  },
   emptyTab: {
     alignItems: 'center',
     paddingVertical: 48,
@@ -594,5 +617,20 @@ const styles = StyleSheet.create({
   photoViewerImage: {
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
+  },
+});
+
+const podiumStyles = StyleSheet.create({
+  trophyContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  trophyRank: {
+    fontSize: 10,
+    fontWeight: '800',
+    marginTop: -2,
   },
 });
