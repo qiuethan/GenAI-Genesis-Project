@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { View, Image, FlatList, ViewToken } from 'react-native';
+import { View, FlatList, ViewToken } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { IconButton } from '../components/IconButton';
@@ -36,10 +37,10 @@ export const ImageViewerScreen = () => {
 
   const renderPhoto = ({ item }: { item: string }) => (
     <View style={styles.photoContainer}>
-      <Image 
-        source={{ uri: item }} 
+      <Image
+        source={{ uri: item }}
         style={styles.image}
-        resizeMode="contain"
+        contentFit="contain"
       />
     </View>
   );

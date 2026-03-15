@@ -12,8 +12,6 @@ export const getLatestPhoto = async (): Promise<string | null> => {
 
   if (result.assets.length === 0) return null;
 
-  // asset.uri is ph:// which <Image> can't load.
-  // getAssetInfoAsync returns localUri (file://) which works.
-  const info = await MediaLibrary.getAssetInfoAsync(result.assets[0]);
-  return info?.localUri ?? null;
+  // asset.uri is ph:// — expo-image's <Image> can load these directly.
+  return result.assets[0].uri;
 };
