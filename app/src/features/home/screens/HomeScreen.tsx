@@ -10,11 +10,11 @@ import {
   Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, CompositeNavigationProp } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useActiveChallenge, useUpcomingChallenges } from '../../challenges/hooks/useChallenges';
-import { useChallengeSubmissions } from '../../challenges/hooks/useSubmissions';
+import { useFollowingFeed } from '../../challenges/hooks/useSubmissions';
 import { useAuth } from '../../auth/context/AuthContext';
 import { useCountdown } from '../../../shared/hooks/useCountdown';
 import { PostCard } from '../../../shared/components/PostCard';
@@ -117,7 +117,7 @@ export function HomeScreen() {
   >>();
   const { challenge: activeChallenge, loading: challengeLoading, refetch: refetchChallenge } = useActiveChallenge();
   const { challenges: upcoming, refetch: refetchUpcoming } = useUpcomingChallenges();
-  const { submissions, loading: feedLoading, refetch: refetchFeed } = useChallengeSubmissions(activeChallenge?.id, user?.id);
+  const { submissions, loading: feedLoading, refetch: refetchFeed } = useFollowingFeed(user?.id);
 
   const refreshing = challengeLoading || feedLoading;
 
@@ -126,6 +126,12 @@ export function HomeScreen() {
     refetchUpcoming();
     refetchFeed();
   }, [refetchChallenge, refetchUpcoming, refetchFeed]);
+
+  useFocusEffect(
+    useCallback(() => {
+      handleRefresh();
+    }, [handleRefresh])
+  );
 
   const renderHeader = () => (
     <View>
@@ -156,7 +162,7 @@ export function HomeScreen() {
 
       {submissions.length > 0 && (
         <Text style={[styles.sectionTitle, { paddingHorizontal: 16, marginTop: 16 }]}>
-          Submissions
+          Feed
         </Text>
       )}
     </View>
@@ -181,8 +187,8 @@ export function HomeScreen() {
         renderItem={({ item }) => (
           <PostCard
             item={item}
-            showRank
             currentUserId={user?.id}
+            onPressPhoto={() => navigation.navigate('PhotoViewer', { uri: item.photo_url })}
             onPressUser={() => {
               if (item.user_id === user?.id) {
                 navigation.navigate('ProfileTab');

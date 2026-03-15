@@ -31,15 +31,21 @@ export function SettingsScreen({ navigation }: Props) {
           <Text style={styles.rowChevron}>›</Text>
         </TouchableOpacity>
 
-        <View style={styles.row}>
+        <TouchableOpacity
+          style={styles.row}
+          onPress={() => navigation.navigate('NotificationSettings')}
+        >
           <Text style={styles.rowText}>Notification Preferences</Text>
           <Text style={styles.rowChevron}>›</Text>
-        </View>
+        </TouchableOpacity>
 
-        <View style={styles.row}>
+        <TouchableOpacity
+          style={styles.row}
+          onPress={() => navigation.navigate('PrivacySettings')}
+        >
           <Text style={styles.rowText}>Privacy</Text>
           <Text style={styles.rowChevron}>›</Text>
-        </View>
+        </TouchableOpacity>
       </View>
 
       <TouchableOpacity style={styles.signOutButton} onPress={signOut}>

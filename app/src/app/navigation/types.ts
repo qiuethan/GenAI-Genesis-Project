@@ -30,6 +30,7 @@ export type HomeStackParamList = {
   UserProfile: { userId: string };
   FollowersList: { userId: string };
   FollowingList: { userId: string };
+  PhotoViewer: { uri: string };
 };
 
 export type ExploreStackParamList = {
@@ -38,6 +39,8 @@ export type ExploreStackParamList = {
   UserProfile: { userId: string };
   FollowersList: { userId: string };
   FollowingList: { userId: string };
+  PhotoViewer: { uri: string };
+  ChallengeDetail: { challengeId: string };
 };
 
 export type CameraStackParamList = {
@@ -65,16 +68,24 @@ export type ChallengesStackParamList = {
   ChallengesList: undefined;
   ChallengeDetail: { challengeId: string };
   SubmitPhoto: { challengeId: string };
+  UserProfile: { userId: string };
+  FollowersList: { userId: string };
+  FollowingList: { userId: string };
+  PhotoViewer: { uri: string };
 };
 
 export type ProfileStackParamList = {
   Profile: undefined;
   EditProfile: undefined;
   Settings: undefined;
+  NotificationSettings: undefined;
+  PrivacySettings: undefined;
   UserSearch: undefined;
   UserProfile: { userId: string };
   FollowersList: { userId: string };
   FollowingList: { userId: string };
+  PhotoViewer: { uri: string };
+  ChallengeDetail: { challengeId: string };
 };
 
 // ---- Navigation prop helpers ----
@@ -94,6 +105,7 @@ export type UserProfileScreensParamList = {
   UserProfile: { userId: string };
   FollowersList: { userId: string };
   FollowingList: { userId: string };
+  ChallengeDetail: { challengeId: string };
 };
 
 export type UserSearchScreensParamList = {

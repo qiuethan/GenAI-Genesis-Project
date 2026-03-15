@@ -11,12 +11,13 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../auth/context/AuthContext';
 import {
   useUserProfile,
   useUserSubmissions,
+  useUserChallengeHistory,
   useUserPodiums,
 } from '../../../shared/hooks/useProfile';
 import { followUser, unfollowUser, isFollowing } from '../../../shared/services/followService';
@@ -35,7 +36,7 @@ type Props = {
   route: RouteProp<UserProfileScreensParamList, 'UserProfile'>;
 };
 
-type Tab = 'photos' | 'podium';
+type Tab = 'photos' | 'challenges' | 'podium';
 
 export function UserProfileScreen({ route }: Props) {
   const { userId } = route.params;
@@ -43,6 +44,7 @@ export function UserProfileScreen({ route }: Props) {
   const { user: currentUser } = useAuth();
   const { profile, loading: profileLoading, refetch: refetchProfile } = useUserProfile(userId);
   const { submissions } = useUserSubmissions(userId);
+  const { entries } = useUserChallengeHistory(userId);
   const { podiums } = useUserPodiums(userId);
 
   const [activeTab, setActiveTab] = useState<Tab>('photos');
@@ -78,6 +80,12 @@ export function UserProfileScreen({ route }: Props) {
   const handleRefresh = useCallback(() => {
     refetchProfile();
   }, [refetchProfile]);
+
+  useFocusEffect(
+    useCallback(() => {
+      refetchProfile();
+    }, [refetchProfile])
+  );
 
   if (profileLoading && !profile) {
     return (
@@ -122,7 +130,7 @@ export function UserProfileScreen({ route }: Props) {
 
         {profile?.composition_badge && (
           <View style={styles.badge}>
-            <Text style={styles.badgeText}>◈ {profile.composition_badge}</Text>
+            <Text style={styles.badgeText}>◈ Best at {profile.composition_badge}</Text>
           </View>
         )}
 
@@ -178,6 +186,12 @@ export function UserProfileScreen({ route }: Props) {
           <Ionicons name="grid-outline" size={20} color={activeTab === 'photos' ? '#fff' : '#555'} />
         </TouchableOpacity>
         <TouchableOpacity
+          style={[styles.tabItem, activeTab === 'challenges' && styles.tabItemActive]}
+          onPress={() => setActiveTab('challenges')}
+        >
+          <Ionicons name="trophy-outline" size={20} color={activeTab === 'challenges' ? '#fff' : '#555'} />
+        </TouchableOpacity>
+        <TouchableOpacity
           style={[styles.tabItem, activeTab === 'podium' && styles.tabItemActive]}
           onPress={() => setActiveTab('podium')}
         >
@@ -187,7 +201,11 @@ export function UserProfileScreen({ route }: Props) {
     </View>
   );
 
-  const medals = ['\u{1F947}', '\u{1F948}', '\u{1F949}'];
+  const TROPHY_COLORS: Record<number, { trophy: string; bg: string; rank: string }> = {
+    1: { trophy: '#FFD700', bg: 'rgba(255, 215, 0, 0.12)', rank: '#FFD700' },
+    2: { trophy: '#C0C0C0', bg: 'rgba(192, 192, 192, 0.10)', rank: '#C0C0C0' },
+    3: { trophy: '#CD7F32', bg: 'rgba(205, 127, 50, 0.10)', rank: '#CD7F32' },
+  };
 
   const renderTabContent = () => {
     if (activeTab === 'photos') {
@@ -202,7 +220,56 @@ export function UserProfileScreen({ route }: Props) {
       return (
         <View style={styles.grid}>
           {submissions.map((s) => (
-            <Image key={s.id} source={{ uri: s.photo_url }} style={styles.gridItem} />
+            <TouchableOpacity key={s.id} activeOpacity={0.8} onPress={() => navigation.navigate('PhotoViewer' as any, { uri: s.photo_url })}>
+              <Image source={{ uri: s.photo_url }} style={styles.gridItem} />
+            </TouchableOpacity>
+          ))}
+        </View>
+      );
+    }
+
+    if (activeTab === 'challenges') {
+      if (entries.length === 0) {
+        return (
+          <View style={styles.emptyTab}>
+            <Ionicons name="trophy-outline" size={32} color="#333" />
+            <Text style={styles.emptyTabText}>No challenges entered</Text>
+          </View>
+        );
+      }
+      return (
+        <View style={styles.podiumList}>
+          {entries.map((entry) => (
+            <TouchableOpacity
+              key={entry.id}
+              style={styles.podiumRow}
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate('ChallengeDetail' as any, { challengeId: entry.challenge_id })}
+            >
+              <Image
+                source={{ uri: entry.photo_url }}
+                style={styles.podiumThumb}
+                resizeMode="cover"
+              />
+              <View style={styles.podiumInfo}>
+                <Text style={styles.podiumTitle} numberOfLines={1}>
+                  {entry.challenge_title}
+                </Text>
+                <Text style={styles.podiumMeta}>
+                  {COMPOSITION_LABELS[entry.composition_type] ?? entry.composition_type}
+                </Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                {entry.rank != null && (
+                  <Text style={styles.podiumScore}>#{entry.rank}</Text>
+                )}
+                {entry.score != null && (
+                  <Text style={styles.podiumMeta}>
+                    {(entry.score * 100).toFixed(0)}
+                  </Text>
+                )}
+              </View>
+            </TouchableOpacity>
           ))}
         </View>
       );
@@ -211,36 +278,47 @@ export function UserProfileScreen({ route }: Props) {
     if (podiums.length === 0) {
       return (
         <View style={styles.emptyTab}>
-          <Ionicons name="medal-outline" size={32} color="#333" />
+          <Ionicons name="trophy-outline" size={32} color="#333" />
           <Text style={styles.emptyTabText}>No podium finishes yet</Text>
         </View>
       );
     }
     return (
       <View style={styles.podiumList}>
-        {podiums.map((entry) => (
-          <View key={entry.id} style={styles.podiumRow}>
-            <Text style={styles.podiumMedal}>{medals[(entry.rank ?? 1) - 1] ?? ''}</Text>
-            <Image
-              source={{ uri: entry.photo_url }}
-              style={styles.podiumThumb}
-              resizeMode="cover"
-            />
-            <View style={styles.podiumInfo}>
-              <Text style={styles.podiumTitle} numberOfLines={1}>
-                {entry.challenge_title}
-              </Text>
-              <Text style={styles.podiumMeta}>
-                {COMPOSITION_LABELS[entry.composition_type] ?? entry.composition_type}
-              </Text>
-            </View>
-            {entry.score != null && (
-              <Text style={styles.podiumScore}>
-                {(entry.score * 100).toFixed(0)}
-              </Text>
-            )}
-          </View>
-        ))}
+        {podiums.map((entry) => {
+          const colors = TROPHY_COLORS[entry.rank ?? 1] ?? TROPHY_COLORS[3];
+          return (
+            <TouchableOpacity
+              key={entry.id}
+              style={styles.podiumRow}
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate('ChallengeDetail' as any, { challengeId: entry.challenge_id })}
+            >
+              <View style={[podiumIconStyles.trophyContainer, { backgroundColor: colors.bg }]}>
+                <Ionicons name="trophy" size={18} color={colors.trophy} />
+                <Text style={[podiumIconStyles.trophyRank, { color: colors.rank }]}>{entry.rank ?? 1}</Text>
+              </View>
+              <Image
+                source={{ uri: entry.photo_url }}
+                style={styles.podiumThumb}
+                resizeMode="cover"
+              />
+              <View style={styles.podiumInfo}>
+                <Text style={styles.podiumTitle} numberOfLines={1}>
+                  {entry.challenge_title}
+                </Text>
+                <Text style={styles.podiumMeta}>
+                  {COMPOSITION_LABELS[entry.composition_type] ?? entry.composition_type}
+                </Text>
+              </View>
+              {entry.score != null && (
+                <Text style={styles.podiumScore}>
+                  {(entry.score * 100).toFixed(0)}
+                </Text>
+              )}
+            </TouchableOpacity>
+          );
+        })}
       </View>
     );
   };
@@ -428,9 +506,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     gap: 10,
   },
-  podiumMedal: {
-    fontSize: 24,
-  },
   podiumThumb: {
     width: 48,
     height: 48,
@@ -453,5 +528,20 @@ const styles = StyleSheet.create({
   podiumScore: {
     fontSize: 13,
     color: '#888',
+  },
+});
+
+const podiumIconStyles = StyleSheet.create({
+  trophyContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  trophyRank: {
+    fontSize: 10,
+    fontWeight: '800',
+    marginTop: -2,
   },
 });

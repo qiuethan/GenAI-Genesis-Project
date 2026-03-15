@@ -155,8 +155,10 @@ export function ChallengeDetailScreen({ route }: Props) {
           <PostCard
             item={item}
             showRank
+            totalSubmissions={submissions.length}
             currentUserId={user?.id}
-            onPressUser={() => navigation.navigate('UserProfile' as never, { userId: item.user_id } as never)}
+            onPressPhoto={() => navigation.navigate('PhotoViewer', { uri: item.photo_url })}
+            onPressUser={() => navigation.navigate('UserProfile', { userId: item.user_id })}
           />
         )}
         ListHeaderComponent={renderHeader}

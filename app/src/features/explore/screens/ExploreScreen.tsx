@@ -7,7 +7,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../auth/context/AuthContext';
 import { useGlobalFeed } from '../../challenges/hooks/useSubmissions';
@@ -20,6 +20,12 @@ export function ExploreScreen() {
   const { user } = useAuth();
   const navigation = useNavigation<ExploreScreenNavigationProp>();
   const { submissions, loading, refetch } = useGlobalFeed(50, user?.id);
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   const renderEmpty = useCallback(() => {
     if (loading) return <FeedSkeleton count={3} />;
@@ -43,6 +49,8 @@ export function ExploreScreen() {
           <PostCard
             item={item}
             currentUserId={user?.id}
+            showRank
+            onPressPhoto={() => navigation.navigate('PhotoViewer', { uri: item.photo_url })}
             onPressUser={() => navigation.navigate('UserProfile', { userId: item.user_id })}
           />
         )}
