@@ -137,6 +137,11 @@ class CompositionHandler(BaseHTTPRequestHandler):
         jpeg_data = self.rfile.read(content_length)
         try:
             frame = _decode_jpeg_with_exif(jpeg_data)
+        except Exception:
+            self._json_response(400, {'error': 'invalid image'})
+            return
+
+        try:
             t0 = time.perf_counter()
             with _gpu_lock:
                 result = _predictor.predict(frame)

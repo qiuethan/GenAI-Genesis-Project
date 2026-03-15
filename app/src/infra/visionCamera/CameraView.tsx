@@ -1,24 +1,27 @@
 import { forwardRef, useImperativeHandle, useRef } from 'react';
 import { StyleSheet } from 'react-native';
-import { Camera, CameraDevice, useCameraDevice, useCameraPermission, ReadonlyFrameProcessor } from 'react-native-vision-camera';
+import { Camera, CameraDevice, ReadonlyFrameProcessor } from 'react-native-vision-camera';
+import Reanimated, { useAnimatedProps, SharedValue } from 'react-native-reanimated';
+
+const ReanimatedCamera = Reanimated.createAnimatedComponent(Camera);
 
 export interface CameraHandle {
-  takePhoto: (flash: 'off' | 'on' | 'auto') => Promise<string>; // Returns path
-  takeSnapshot: () => Promise<string>; // Returns path — captures what's on screen
+  takePhoto: (flash: 'off' | 'on' | 'auto') => Promise<string>;
+  takeSnapshot: () => Promise<string>;
   focus: (point: { x: number; y: number }) => Promise<void>;
 }
 
 interface Props {
   device: CameraDevice | undefined;
   isActive: boolean;
-  zoom?: number;
+  zoom?: SharedValue<number>;
   torch?: 'off' | 'on';
-  exposure?: number; // -1 to 1 range (will be mapped to device range)
+  exposure?: number;
   lowLightBoost?: boolean;
   frameProcessor?: ReadonlyFrameProcessor;
 }
 
-export const CameraView = forwardRef<CameraHandle, Props>(({ device, isActive, zoom = 1.0, torch = 'off', exposure = 0, lowLightBoost = false, frameProcessor }, ref) => {
+export const CameraView = forwardRef<CameraHandle, Props>(({ device, isActive, zoom, torch = 'off', exposure = 0, lowLightBoost = false, frameProcessor }, ref) => {
   const camera = useRef<Camera>(null);
 
   useImperativeHandle(ref, () => ({
@@ -40,22 +43,24 @@ export const CameraView = forwardRef<CameraHandle, Props>(({ device, isActive, z
     }
   }));
 
+  const animatedProps = useAnimatedProps(() => ({
+    zoom: zoom?.value ?? 1,
+  }));
+
   if (!device) return null;
 
-  // Map exposure from -1 to 1 range to a reasonable portion of device's exposure range
-  // Using 25% of max to prevent extreme over/under exposure
   const maxRange = Math.min(device?.maxExposure ?? 2, 2);
   const mappedExposure = exposure * maxRange * 0.5;
 
   return (
-    <Camera
+    <ReanimatedCamera
       ref={camera}
       style={StyleSheet.absoluteFill}
       device={device}
       isActive={isActive}
       photo={true}
       video={true}
-      zoom={zoom}
+      animatedProps={animatedProps}
       torch={torch}
       exposure={mappedExposure}
       lowLightBoost={lowLightBoost && device?.supportsLowLightBoost}

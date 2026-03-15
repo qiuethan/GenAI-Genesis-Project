@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Image, useWindowDimensions, Animated, StyleSheet, Pressable } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { cameraStyles as styles } from '../styles';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PinchGestureHandler, PinchGestureHandlerGestureEvent, State } from 'react-native-gesture-handler';
@@ -35,7 +36,14 @@ import { ShakeCoachOverlay } from '../components/ShakeCoachOverlay';
 import { LevelCoachOverlay } from '../components/LevelCoachOverlay';
 import { ExposureCoachOverlay } from '../components/ExposureCoachOverlay';
 import { ScanOverlay } from '../components/ScanOverlay';
-import { DevTools } from '../components/DevTools';
+
+const scoreToColor = (score: number): string => {
+  const t = Math.max(0, Math.min(1, score / 100));
+  if (t < 0.25) return '#ff4444';
+  if (t < 0.5) return '#ff9900';
+  if (t < 0.75) return '#aacc00';
+  return '#44cc44';
+};
 
 export const CameraScreen = () => {
   // State
@@ -63,7 +71,7 @@ export const CameraScreen = () => {
   const isFocused = useIsFocused();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const device = useSelfCameraDevice(position);
-  const { zoom, config: zoomConfig, setZoom, onPinchBegan, onPinchUpdate, onPinchEnd, isPinching } = useZoom(device);
+  const { zoom, zoomShared, config: zoomConfig, setZoom, onPinchBegan, onPinchUpdate, onPinchEnd, isPinching } = useZoom(device);
 
   const analysisFrameProcessor = useAnalysisFrameProcessor({
     onExposureMetrics: exposureCoach.onMetrics,
@@ -74,7 +82,7 @@ export const CameraScreen = () => {
   let camHeight = screenWidth * 4 / 3; // Default 4:3
   if (aspectRatio === '16:9') camHeight = screenWidth * 16 / 9;
   if (aspectRatio === '1:1') camHeight = screenWidth;
-  
+
   // Calculate top margin to center camera with bottom bias (x=60 taller bottom bar)
   // T = (EmptySpace - x) / 2
   const verticalBias = 60;
@@ -180,14 +188,14 @@ export const CameraScreen = () => {
   const doCapture = async () => {
     try {
       // If flash is on, auto (when dark), or torch, keep it on for 1.5 seconds first
-      const shouldPreFlash = flash === 'on' || 
-                            flash === 'torch' || 
+      const shouldPreFlash = flash === 'on' ||
+                            flash === 'torch' ||
                             (flash === 'auto' && sceneBrightness < 0.3);
-      
+
       if (shouldPreFlash) {
         await new Promise(resolve => setTimeout(resolve, 1500));
       }
-      
+
       // Trigger shutter animation and take photo simultaneously
       shutterRef.current?.trigger();
       const path = await takePhoto(cameraRef, flash, sceneBrightness);
@@ -205,7 +213,7 @@ export const CameraScreen = () => {
       // Handle portrait vs landscape
       const isPortrait = height > width;
       const currentRatio = height / width;
-      const desiredRatio = isPortrait ? targetRatio : 1 / targetRatio; 
+      const desiredRatio = isPortrait ? targetRatio : 1 / targetRatio;
 
       let cropConfig: ImageManipulator.ActionCrop['crop'] | null = null;
 
@@ -229,7 +237,7 @@ export const CameraScreen = () => {
       }
 
       let finalPath = `file://${path}`;
-      
+
       // Add crop if needed
       if (cropConfig) {
         const cropResult = await ImageManipulator.manipulateAsync(
@@ -308,16 +316,19 @@ export const CameraScreen = () => {
 
   if (!hasPermission) return <View style={styles.center}><Text style={styles.text}>No Permission</Text></View>;
 
+  const aestheticColor = composition.result ? scoreToColor(composition.result.score) : '#666';
+  const compositionColor = composition.result ? scoreToColor(composition.result.score) : '#666';
+
   return (
     <View style={styles.container}>
       <ShutterFlash ref={shutterRef} />
-      
+
       {/* Camera Layer with Pinch */}
       <PinchGestureHandler
         onGestureEvent={onPinchEvent}
         onHandlerStateChange={onPinchStateChange}
       >
-        <Pressable 
+        <Pressable
           style={{ flex: 1 }}
           onPress={(event) => {
             const { locationX, locationY } = event.nativeEvent;
@@ -325,16 +336,17 @@ export const CameraScreen = () => {
           }}
         >
           {device ? (
-            <CameraView 
-              ref={cameraRef} 
-              device={device} 
+            <CameraView
+              ref={cameraRef}
+              device={device}
               isActive={isFocused}
-              zoom={zoom}
-                          torch={flash === 'torch' ? 'on' : 'off'}
-                          exposure={exposureControl.exposure / 2}
-                          lowLightBoost={nightMode.nightMode !== 'off'}
-                          frameProcessor={frameProcessor}
-                        />          ) : (
+              zoom={zoomShared}
+              torch={flash === 'torch' ? 'on' : 'off'}
+              exposure={exposureControl.exposure / 2}
+              lowLightBoost={nightMode.nightMode !== 'off'}
+              frameProcessor={frameProcessor}
+            />
+          ) : (
             <View style={styles.center}>
                <Text style={styles.text}>No Device ({position})</Text>
             </View>
@@ -357,12 +369,12 @@ export const CameraScreen = () => {
               pointerEvents="none"
             />
           )}
-          
+
           {/* Mask Overlay with Grid */}
           <View style={StyleSheet.absoluteFill} pointerEvents="none">
             {/* Top Mask */}
             <Animated.View style={{ height: animatedTopMargin, backgroundColor: 'rgba(0,0,0,0.3)' }} />
-            
+
             {/* Clear Middle with Grid */}
             <Animated.View style={{ height: animatedHeight, width: screenWidth, alignSelf: 'center' }}>
               <CompositionPatternOverlay
@@ -388,7 +400,7 @@ export const CameraScreen = () => {
 
           {/* Coaching Overlays */}
           {/* Visual Level Line (Center) - Always mounted, handles own opacity */}
-          <LevelCoachOverlay 
+          <LevelCoachOverlay
             state={levelCoach}
             cameraFrameTop={topMargin}
             cameraFrameHeight={camHeight}
@@ -414,12 +426,22 @@ export const CameraScreen = () => {
 
           {/* Composition Guide Overlay */}
           {scan.guideUri && scan.guideVisible && (
-            <Image
-              source={{ uri: scan.guideUri }}
-              style={[StyleSheet.absoluteFill, { opacity: 1 }]}
-              resizeMode="cover"
+            <View
+              style={{
+                position: 'absolute',
+                top: topMargin,
+                left: 0,
+                right: 0,
+                height: camHeight,
+              }}
               pointerEvents="none"
-            />
+            >
+              <Image
+                source={{ uri: scan.guideUri }}
+                style={{ width: '100%', height: '100%', opacity: 0.35 }}
+                resizeMode="cover"
+              />
+            </View>
           )}
 
           {/* Composition Score Overlay */}
@@ -473,17 +495,17 @@ export const CameraScreen = () => {
         cameraFrameHeight={camHeight}
       />
 
-      {/* Top Bar: Flash (Left) + Chevron (Center) + Ratio (Right) */}
+      {/* Top Bar: Flash (Left) + Scores (Center) + Chevron (Right) */}
       <View style={[styles.topBar, { paddingTop: insets.top }]}>
         {/* Flash shortcut (only if menu closed) */}
         {!isMenuOpen && device?.hasFlash && (
           <View style={[styles.topLeftFlash, { top: insets.top }]}>
             <RotatableView rotation={uiRotation} style={styles.flashContainerColumn}>
               <View style={styles.iconButtonBg}>
-                <IconButton 
-                  iconName={getFlashIcon()} 
-                  color={getFlashColor()} 
-                  onPress={toggleFlash} 
+                <IconButton
+                  iconName={getFlashIcon()}
+                  color={getFlashColor()}
+                  onPress={toggleFlash}
                   size={18}
                 />
               </View>
@@ -492,58 +514,68 @@ export const CameraScreen = () => {
             </RotatableView>
           </View>
         )}
-        
-        {/* Active Settings + Menu Toggle */}
-        <View style={{ alignItems: 'center' }}>
-          {/* Active settings list above chevron when menu closed */}
-          {!isMenuOpen && (exposureControl.exposure !== 0 || nightMode.nightMode !== 'off' || timer.timerDuration > 0) && (
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
-              {timer.timerDuration > 0 && (
-                <Text style={{ color: '#ffe81f', fontSize: 11, fontWeight: '600' }}>{timer.timerDuration}s</Text>
-              )}
-              {nightMode.nightMode !== 'off' && (
-                <Text style={{ color: '#ffe81f', fontSize: 11, fontWeight: '600' }}>🌙</Text>
-              )}
-              {exposureControl.exposure !== 0 && (
-                <Text style={{ color: '#ffe81f', fontSize: 11, fontWeight: '600' }}>
-                  {exposureControl.exposure > 0 ? '+' : ''}{exposureControl.exposure}
-                </Text>
-              )}
-            </View>
-          )}
-          
-          {/* Menu Toggle Chevron */}
-          <RotatableView rotation={isMenuOpen ? 180 : 0} style={styles.chevronContainer}>
-             <View style={styles.iconButtonBg}>
-               <IconButton 
-                 iconName="caret-up" 
-                 size={18} 
-                 onPress={() => setIsMenuOpen(!isMenuOpen)} 
-               />
-             </View>
-          </RotatableView>
-        </View>
 
-        {/* Aspect Ratio Shortcut (Right) */}
+        {/* Scores (Center) */}
         {!isMenuOpen && (
-          <View style={[styles.topRightRatio, { top: insets.top }]}>
-            <RotatableView rotation={uiRotation}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 6 }}>
+            {/* Aesthetic Score */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6 }}>
+              <Ionicons name="flower-outline" size={15} color={aestheticColor} />
+              <Text style={{ color: aestheticColor, fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
+                {composition.result ? Math.round(composition.result.score) : '--'}
+              </Text>
+            </View>
+
+            {/* Composition Score */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6 }}>
+              <MaterialCommunityIcons name="image-filter-hdr" size={15} color={compositionColor} />
+              <Text style={{ color: compositionColor, fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
+                {composition.result ? Math.round(composition.result.score) : '--'}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Menu Toggle + Active Settings (Right) */}
+        <View style={[styles.topRightRatio, { top: insets.top }]}>
+          <View style={{ alignItems: 'center' }}>
+            {/* Active settings above chevron */}
+            {!isMenuOpen && (exposureControl.exposure !== 0 || nightMode.nightMode !== 'off' || timer.timerDuration > 0) && (
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
+                {timer.timerDuration > 0 && (
+                  <Text style={{ color: '#ffe81f', fontSize: 11, fontWeight: '600' }}>{timer.timerDuration}s</Text>
+                )}
+                {nightMode.nightMode !== 'off' && (
+                  <Ionicons name="moon" size={11} color="#ffe81f" />
+                )}
+                {exposureControl.exposure !== 0 && (
+                  <Text style={{ color: '#ffe81f', fontSize: 11, fontWeight: '600' }}>
+                    {exposureControl.exposure > 0 ? '+' : ''}{exposureControl.exposure}
+                  </Text>
+                )}
+              </View>
+            )}
+
+            {/* Menu Toggle Chevron */}
+            <RotatableView rotation={isMenuOpen ? 180 : 0} style={styles.chevronContainer}>
                <View style={styles.iconButtonBg}>
-                 <TouchableOpacity onPress={cycleAspectRatio} style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
-                   <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 10 }}>{aspectRatio}</Text>
-                 </TouchableOpacity>
+                 <IconButton
+                   iconName="caret-up"
+                   size={18}
+                   onPress={() => setIsMenuOpen(!isMenuOpen)}
+                 />
                </View>
             </RotatableView>
           </View>
-        )}
+        </View>
       </View>
 
       {/* Controls Menu (Top, under bar) */}
       {isMenuOpen && (
          <View style={[styles.menuContainer, { top: insets.top + 50 }]}>
-           <CameraControlsMenu 
-              isOpen={isMenuOpen} 
-              flashMode={flash} 
+           <CameraControlsMenu
+              isOpen={isMenuOpen}
+              flashMode={flash}
               onFlashPress={toggleFlash}
               aspectRatio={aspectRatio}
               onAspectRatioPress={cycleAspectRatio}
@@ -560,25 +592,25 @@ export const CameraScreen = () => {
       {/* Zoom Controls (Aligned to bottom of camera frame) */}
       {position === 'back' && zoomConfig.stops.length > 1 && (() => {
         const SNAP_THRESHOLD = 0.08;
-        
+
         const closestStop = zoomConfig.stops.reduce((closest, stop) => {
           const currentDist = Math.abs(stop.zoom - zoom) / stop.zoom;
           const closestDist = Math.abs(closest.zoom - zoom) / closest.zoom;
           return currentDist < closestDist ? stop : closest;
         });
-        
+
         const isSnappedToPreset = Math.abs(closestStop.zoom - zoom) / closestStop.zoom <= SNAP_THRESHOLD;
-        
+
         const displayItems = zoomConfig.stops.map((stop, index) => {
           if (isSnappedToPreset && stop.zoom === closestStop.zoom) {
             return stop;
           }
-          
+
           const nextStopIndex = zoomConfig.stops.findIndex(s => s.zoom > zoom);
-          const replaceIndex = nextStopIndex === -1 
-            ? zoomConfig.stops.length - 1 
+          const replaceIndex = nextStopIndex === -1
+            ? zoomConfig.stops.length - 1
             : Math.max(0, nextStopIndex - 1);
-          
+
           if (index === replaceIndex && !isSnappedToPreset) {
             return {
               label: formatZoomDisplay(zoom, zoomConfig.neutralZoom),
@@ -587,16 +619,16 @@ export const CameraScreen = () => {
               originalStop: stop,
             };
           }
-          
+
           return stop;
         });
-        
+
         return (
           <Animated.View style={[styles.zoomContainer, { top: Animated.add(animatedTopMargin, Animated.add(animatedHeight, -50)) }]}>
             {displayItems.map((item, index) => {
               const isDynamic = 'isDynamic' in item && item.isDynamic;
               const isSelected = !isDynamic && Math.abs(item.zoom - zoom) < 0.01;
-              
+
               if (isDynamic) {
                 return (
                   <View key={`dynamic-${index}`}>
@@ -610,13 +642,13 @@ export const CameraScreen = () => {
                   </View>
                 );
               }
-              
+
               return (
                 <RotatableView key={item.label} rotation={uiRotation}>
-                  <TouchableOpacity 
-                    onPress={() => setZoom(item.zoom)} 
+                  <TouchableOpacity
+                    onPress={() => setZoom(item.zoom)}
                     style={[
-                      styles.zoomButton, 
+                      styles.zoomButton,
                       isSelected && styles.zoomButtonActive,
                     ]}
                   >
@@ -633,13 +665,13 @@ export const CameraScreen = () => {
 
       {/* Controls Area (Bottom) */}
       <View style={styles.bottomBar}>
-        
+
         {/* Main Controls Background */}
         <View style={[styles.controlsBackground, { paddingBottom: Math.max(0, insets.bottom - 10) }]}>
           {/* Main Control Bar */}
           <View style={styles.controlBar}>
             {/* Gallery Thumbnail */}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.sideButton}
               onPress={() => {
                 (navigation as any).navigate('Gallery');
@@ -662,16 +694,16 @@ export const CameraScreen = () => {
             {/* Switch Camera */}
             <RotatableView rotation={uiRotation}>
               <View style={styles.sideButton}>
-                <IconButton 
-                  iconName="camera-reverse" 
-                  size={32} 
-                  onPress={toggleCamera} 
+                <IconButton
+                  iconName="camera-reverse"
+                  size={32}
+                  onPress={toggleCamera}
                   style={styles.iconButtonBg}
                 />
               </View>
             </RotatableView>
           </View>
-          
+
           {/* Mode Selector */}
           <View style={styles.modeTextWrapper}>
             {!scan.isScanMode ? (
@@ -693,19 +725,6 @@ export const CameraScreen = () => {
         </View>
       </View>
 
-      {/* Dev Tools Overlay */}
-      <DevTools 
-        enabled={__DEV__}
-        shakeCoach={shakeCoach.state}
-        exposureCoach={exposureCoach.state}
-        levelCoach={levelCoach}
-        additionalMetrics={{
-          zoom: zoom.toFixed(2),
-          position,
-          flash,
-        }}
-      />
     </View>
   );
 };
-

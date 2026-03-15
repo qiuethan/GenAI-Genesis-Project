@@ -12,9 +12,6 @@ export { useZoom } from './useZoom';
 export {
   getZoomConfig,
   clampZoom,
-  applyIncrementalPinchZoom,
-  smoothZoom,
-  shouldSuppressJitter,
   formatZoomDisplay,
 } from './zoom';
 export type { ZoomConfig, ZoomStop } from './zoom';

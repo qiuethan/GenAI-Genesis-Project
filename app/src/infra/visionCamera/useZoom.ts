@@ -1,75 +1,43 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { CameraDevice } from 'react-native-vision-camera';
-import { getZoomConfig, clampZoom, applyIncrementalPinchZoom, smoothZoom, shouldSuppressJitter } from './zoom';
+import { useSharedValue, withSpring } from 'react-native-reanimated';
+import { getZoomConfig, clampZoom } from './zoom';
+
+const PINCH_DAMPING = 0.6;
 
 export function useZoom(device: CameraDevice | undefined) {
   const config = getZoomConfig(device);
-  const [zoomTarget, setZoomTarget] = useState(config.neutralZoom);
-  const [zoomSmoothed, setZoomSmoothed] = useState(config.neutralZoom);
+  const zoomShared = useSharedValue(config.neutralZoom);
+  const [zoomDisplay, setZoomDisplay] = useState(config.neutralZoom);
   const [isPinching, setIsPinching] = useState(false);
-  
-  const zoomTargetRef = useRef(zoomTarget);
-  const zoomSmoothedRef = useRef(zoomSmoothed);
   const lastScaleRef = useRef(1);
-
-  useEffect(() => {
-    zoomTargetRef.current = zoomTarget;
-  }, [zoomTarget]);
-
-  useEffect(() => {
-    zoomSmoothedRef.current = zoomSmoothed;
-  }, [zoomSmoothed]);
+  const configRef = useRef(config);
+  configRef.current = config;
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (device) {
       const newConfig = getZoomConfig(device);
-      setZoomTarget(newConfig.neutralZoom);
-      setZoomSmoothed(newConfig.neutralZoom);
+      zoomShared.value = newConfig.neutralZoom;
+      setZoomDisplay(newConfig.neutralZoom);
     }
   }, [device?.id]);
 
   useEffect(() => {
-    let rafId: number | null = null;
-    let isActive = true;
-    
-    const animate = () => {
-      if (!isActive) return;
-      
-      const current = zoomSmoothedRef.current;
-      const target = zoomTargetRef.current;
-      
-      if (shouldSuppressJitter(target, current, config.neutralZoom)) {
-        rafId = null;
-        return;
-      }
-
-      const newSmoothed = smoothZoom(current, target, 0.3);
-      
-      if (Math.abs(newSmoothed - current) > 0.001) {
-        setZoomSmoothed(newSmoothed);
-        if (isActive) {
-          rafId = requestAnimationFrame(animate);
-        }
-      } else {
-        rafId = null;
-      }
-    };
-    
-    rafId = requestAnimationFrame(animate);
-    
     return () => {
-      isActive = false;
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId);
-        rafId = null;
-      }
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
     };
-  }, [zoomTarget, config.neutralZoom]);
+  }, []);
 
-  const setZoomValue = useCallback((newZoom: number) => {
-    const clamped = clampZoom(newZoom, config);
-    setZoomTarget(clamped);
-  }, [config]);
+  const setZoom = useCallback((newZoom: number) => {
+    const clamped = clampZoom(newZoom, configRef.current);
+    zoomShared.value = withSpring(clamped, {
+      damping: 18,
+      stiffness: 140,
+      mass: 0.4,
+    });
+    setZoomDisplay(clamped);
+  }, []);
 
   const onPinchBegan = useCallback(() => {
     lastScaleRef.current = 1;
@@ -77,29 +45,32 @@ export function useZoom(device: CameraDevice | undefined) {
   }, []);
 
   const onPinchUpdate = useCallback((gestureScale: number) => {
-    const newZoom = applyIncrementalPinchZoom(
-      zoomTargetRef.current,
-      gestureScale,
-      lastScaleRef.current,
-      config
-    );
-    
+    const ratio = gestureScale / lastScaleRef.current;
+    const dampedRatio = Math.pow(ratio, PINCH_DAMPING);
+    const newZoom = clampZoom(zoomShared.value * dampedRatio, configRef.current);
     lastScaleRef.current = gestureScale;
-    
-    if (Math.abs(newZoom - zoomTargetRef.current) > 0.001) {
-      setZoomTarget(newZoom);
+    zoomShared.value = newZoom;
+
+    // Throttle display sync to ~20fps (enough for UI labels)
+    if (!syncTimerRef.current) {
+      syncTimerRef.current = setTimeout(() => {
+        syncTimerRef.current = null;
+        setZoomDisplay(zoomShared.value);
+      }, 50);
     }
-  }, [config]);
+  }, []);
 
   const onPinchEnd = useCallback(() => {
     lastScaleRef.current = 1;
     setIsPinching(false);
+    setZoomDisplay(zoomShared.value);
   }, []);
 
   return {
-    zoom: zoomSmoothed,
+    zoom: zoomDisplay,
+    zoomShared,
     config,
-    setZoom: setZoomValue,
+    setZoom,
     onPinchBegan,
     onPinchUpdate,
     onPinchEnd,

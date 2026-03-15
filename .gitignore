@@ -34,6 +34,7 @@ yarn-error.*
 *.pem
 
 # Environment
+.env
 .env*.local
 server/.env
 
@@ -51,3 +52,5 @@ __pycache__/
 # External reference repos/datasets
 Image-Composition-Assessment-Dataset-CADB/
 TANet-image-aesthetics-and-quality-assessment/
+
+.env
