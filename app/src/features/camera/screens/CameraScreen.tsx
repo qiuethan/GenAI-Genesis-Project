@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, Image, useWindowDimensions, Animated, Sty
 import { cameraStyles as styles } from '../styles';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PinchGestureHandler, PinchGestureHandlerGestureEvent, State } from 'react-native-gesture-handler';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useIsFocused } from '@react-navigation/native';
 import * as ImageManipulator from 'expo-image-manipulator';
 
 import {
@@ -57,13 +57,14 @@ export const CameraScreen = () => {
 
   // Hooks
   const navigation = useNavigation();
+  const isFocused = useIsFocused();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const device = useSelfCameraDevice(position);
   const { zoom, config: zoomConfig, setZoom, onPinchBegan, onPinchUpdate, onPinchEnd, isPinching } = useZoom(device);
 
   const analysisFrameProcessor = useAnalysisFrameProcessor({
     onExposureMetrics: exposureCoach.onMetrics,
-    enabled: true,
+    enabled: isFocused,
   });
 
   // Calculate camera height based on aspect ratio
@@ -106,7 +107,7 @@ export const CameraScreen = () => {
   const composition = useCompositionScore({
     cameraRef,
     aspectRatio,
-    enabled: !scanActive && !scan.hasResult,
+    enabled: isFocused && !scanActive && !scan.hasResult,
   });
 
   // Mapping device orientation to UI rotation
@@ -319,7 +320,7 @@ export const CameraScreen = () => {
             <CameraView 
               ref={cameraRef} 
               device={device} 
-              isActive={true} 
+              isActive={isFocused}
               zoom={zoom}
                           torch={flash === 'torch' ? 'on' : 'off'}
                           exposure={exposureControl.exposure / 2}

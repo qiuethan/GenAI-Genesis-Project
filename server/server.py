@@ -111,7 +111,11 @@ class CompositionHandler(BaseHTTPRequestHandler):
             filename = f"{ts}_{aes}_{frame.shape[1]}x{frame.shape[0]}.jpg"
             cv2.imwrite(os.path.join(debug_dir, filename), frame)
 
-            print(f"[Analyze] {frame.shape[1]}x{frame.shape[0]} -> aesthetic={aes} in {result['inference_ms']:.0f}ms")
+            comp = result.get('composition_score', '?')
+            pattern = result.get('dominant_pattern_name', '?')
+            attrs = result.get('attributes', {})
+            attr_str = ', '.join(f"{k}={v:.2f}" for k, v in attrs.items()) if attrs else 'none'
+            print(f"[Analyze] {frame.shape[1]}x{frame.shape[0]} -> aesthetic={aes} comp={comp} pattern={pattern} attrs=[{attr_str}] in {result['inference_ms']:.0f}ms")
             self._json_response(200, result)
         except Exception as e:
             print(f"[Analyze] ERROR: {e}")
@@ -157,6 +161,11 @@ class CompositionHandler(BaseHTTPRequestHandler):
 
             # Score the frame
             score_result = _predictor.predict(frame)
+
+            aes = score_result.get('aesthetic_score', '?')
+            comp = score_result.get('composition_score', '?')
+            pattern = score_result.get('dominant_pattern_name', '?')
+            print(f"[Scan] {frame.shape[1]}x{frame.shape[0]} -> aesthetic={aes} comp={comp} pattern={pattern} objects_found={check['all_found']} missing={check['missing']}")
 
             self._json_response(200, {
                 'aesthetic_score': score_result['aesthetic_score'],
@@ -241,6 +250,12 @@ class CompositionHandler(BaseHTTPRequestHandler):
             result = _predictor.predict(frame)
             dt = time.perf_counter() - t0
             result['inference_ms'] = round(dt * 1000, 1)
+            aes = result.get('aesthetic_score', '?')
+            comp = result.get('composition_score', '?')
+            pattern = result.get('dominant_pattern_name', '?')
+            attrs = result.get('attributes', {})
+            attr_str = ', '.join(f"{k}={v:.2f}" for k, v in attrs.items()) if attrs else 'none'
+            print(f"[Score] {frame.shape[1]}x{frame.shape[0]} -> aesthetic={aes} comp={comp} pattern={pattern} attrs=[{attr_str}] in {result['inference_ms']:.0f}ms")
             self._json_response(200, result)
         except Exception as e:
             print(f"[Score] ERROR: {e}")

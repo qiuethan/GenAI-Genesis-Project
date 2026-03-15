@@ -74,16 +74,14 @@ def analyze_composition_with_gemini(
 
     # Call Gemini
     response = client.models.generate_content(
-        model='gemini-2.0-flash-exp',
+        model='gemini-3.1-flash-image-preview',
         contents=[prompt, pil_image],
     )
 
     # Extract annotated image from response
     for part in response.parts:
         if part.inline_data is not None:
-            result_image = part.as_image()
-            buf = io.BytesIO()
-            result_image.save(buf, format='JPEG', quality=90)
-            return buf.getvalue()
+            # inline_data contains the raw image bytes directly
+            return part.inline_data.data
 
     return None
