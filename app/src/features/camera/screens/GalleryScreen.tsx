@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, FlatList, Image, TouchableOpacity, ActivityIndicator, Text, StyleSheet } from 'react-native';
+import { View, FlatList, TouchableOpacity, ActivityIndicator, Text, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { IconButton } from '../components/IconButton';
@@ -45,7 +46,7 @@ export const GalleryScreen = () => {
         <Image
           source={{ uri: item.uri }}
           style={styles.photoImage}
-          resizeMode="cover"
+          contentFit="cover"
         />
         {score && (
           <View style={badgeStyles.badgeContainer}>

@@ -36,6 +36,15 @@ async function saveCache(): Promise<void> {
 }
 
 /**
+ * Cache a score directly (e.g. from scan mode where the server already scored it).
+ */
+export async function cacheScore(photoId: string, score: number, label: string = ''): Promise<void> {
+  await loadCache();
+  _scoreCache[photoId] = { score, label };
+  await saveCache();
+}
+
+/**
  * Score a single photo by sending it to the composition server.
  * Call this after capturing and saving a new photo.
  */
