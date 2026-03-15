@@ -10,8 +10,7 @@ import { imageViewerStyles as styles, IMAGE_VIEWER_CONSTANTS } from '../styles';
 import { CameraStackParamList } from '../types';
 import { removePhotosFromAlbum } from '../hooks/useAlbums';
 import { getServerUrl } from '../../../infra/network/serverUrl';
-import { useGalleryScores, scorePhoto, scoreToColor, removeScores, cacheScore } from '../hooks';
-import type { GalleryScore } from '../hooks';
+import { useGalleryScores, scorePhoto, scoreToColor, removeScores } from '../hooks';
 
 const { SCREEN_WIDTH } = IMAGE_VIEWER_CONSTANTS;
 
