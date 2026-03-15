@@ -26,3 +26,5 @@ export { useCompositionScore } from './useCompositionScore';
 export type { CompositionResult, UseCompositionScoreConfig } from './useCompositionScore';
 export { useScanMode } from './useScanMode';
 export type { ScanResult } from './useScanMode';
+export { useAlbums, createAlbum, deleteAlbum, renameAlbum, addPhotosToAlbum, removePhotosFromAlbum } from './useAlbums';
+export type { Album } from './useAlbums';

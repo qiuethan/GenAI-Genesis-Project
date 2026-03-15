@@ -1,62 +1,202 @@
 import { StyleSheet, Dimensions } from 'react-native';
 
 const { width } = Dimensions.get('window');
-const COLUMNS = 3;
-const SPACING = 2;
-const ITEM_SIZE = (width - (SPACING * (COLUMNS + 1))) / COLUMNS;
+const SECTION_PADDING = 16;
+const ALBUM_CARD_WIDTH = (width - SECTION_PADDING * 2 - 12) / 2;
+const ALBUM_CARD_HEIGHT = ALBUM_CARD_WIDTH * 1.1;
+const CATEGORY_CARD_WIDTH = (width - SECTION_PADDING * 2 - 12) / 2.2;
+const CATEGORY_CARD_HEIGHT = CATEGORY_CARD_WIDTH * 1.2;
 
 export const galleryStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'black',
+    backgroundColor: '#0a0f1a',
   },
   centerContainer: {
     flex: 1,
-    backgroundColor: 'black',
+    backgroundColor: '#0a0f1a',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  header: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-    paddingHorizontal: 20,
-    backgroundColor: 'rgba(0,0,0,0.9)',
+  scrollContent: {
+    paddingBottom: 40,
   },
-  headerContent: {
+
+  // Header
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    paddingHorizontal: SECTION_PADDING,
+    paddingBottom: 20,
   },
-  headerTitle: {
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#1a2030',
+  },
+  avatarFallback: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#1a2535',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarFallbackText: {
     color: 'white',
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
+  },
+  headerTitle: {
     flex: 1,
+    color: 'white',
+    fontSize: 22,
+    fontWeight: '700',
     textAlign: 'center',
   },
-  gridContainer: {
-    padding: SPACING,
+  headerSpacer: {
+    width: 48,
   },
-  row: {
-    justifyContent: 'flex-start',
-    marginBottom: SPACING,
+
+  // Section header
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: SECTION_PADDING,
+    marginBottom: 12,
+    marginTop: 8,
   },
-  photoItem: {
-    width: ITEM_SIZE,
-    height: ITEM_SIZE,
-    marginHorizontal: SPACING / 2,
+  sectionTitle: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: '700',
   },
-  photoImage: {
+  seeAllText: {
+    color: '#4a9eff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+
+  // Album cards
+  albumList: {
+    paddingLeft: SECTION_PADDING,
+    paddingRight: 4,
+  },
+  albumCard: {
+    width: ALBUM_CARD_WIDTH,
+    height: ALBUM_CARD_HEIGHT,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginRight: 12,
+  },
+  albumImage: {
     width: '100%',
     height: '100%',
+  },
+  albumLabelContainer: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+  },
+  albumLabel: {
+    backgroundColor: 'rgba(120, 120, 120, 0.7)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+  },
+  albumLabelText: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  albumPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#1a2030',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  albumCountContainer: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  albumCountText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  // Category cards
+  categoryList: {
+    paddingLeft: SECTION_PADDING,
+    paddingRight: 4,
+  },
+  categoryCard: {
+    width: CATEGORY_CARD_WIDTH,
+    height: CATEGORY_CARD_HEIGHT,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginRight: 12,
+  },
+  categoryImage: {
+    width: '100%',
+    height: '100%',
+  },
+  categoryLabelContainer: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+  },
+  categoryLabel: {
+    backgroundColor: 'rgba(120, 120, 120, 0.7)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+  },
+  categoryLabelText: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  // Utilities
+  utilitiesSection: {
+    paddingHorizontal: SECTION_PADDING,
+    marginTop: 8,
+  },
+  utilityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+  },
+  utilityIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#1a2030',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  utilityLabel: {
+    flex: 1,
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
 
 export const GALLERY_CONSTANTS = {
-  COLUMNS,
-  SPACING,
-  ITEM_SIZE,
+  SECTION_PADDING,
+  ALBUM_CARD_WIDTH,
+  ALBUM_CARD_HEIGHT,
+  CATEGORY_CARD_WIDTH,
+  CATEGORY_CARD_HEIGHT,
 };

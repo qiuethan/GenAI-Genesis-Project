@@ -43,5 +43,7 @@ export interface ImageViewerParams {
 export type CameraStackParamList = {
   Camera: undefined;
   Gallery: undefined;
+  AlbumDetail: { albumId: string; albumName: string };
+  PhotoPicker: { albumId: string };
   ImageViewer: ImageViewerParams;
 };
