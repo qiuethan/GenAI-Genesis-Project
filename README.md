@@ -66,6 +66,23 @@ open ios/Frame.xcworkspace
 
 > **Note**: `npx expo run:ios --device` may not work due to a `devicectl` compatibility bug — use Xcode directly instead.
 
+## Mock data (seed)
+
+To populate challenges and test users so you can try the feed, submissions, and social features:
+
+1. **Challenges** — In the [Supabase SQL Editor](https://supabase.com/dashboard/project/_/sql), run the contents of `supabase/migrations/004_seed_mock_challenges.sql`. This adds one ACTIVE, two SCHEDULED, and two CLOSED challenges.
+
+2. **Test users and submissions** — In `.env` set `SUPABASE_SERVICE_ROLE_KEY` (or keep `SUPABASE_SECRET_KEY`; the script uses either). Then run:
+   ```bash
+   npm run seed
+   ```
+   This creates four users (`alice@frame.test` … `dana@frame.test`, password `testpass123`), gives them profile names, seeds submissions with placeholder images, and adds a few reactions and comments. Log in with any of those emails in the app to verify the feed and challenges.
+
+3. **Seed your profile (followers, following, podiums)** — Run the migration `supabase/migrations/006_seed_profile_william.sql` in the Supabase SQL Editor (or run `supabase db push` if you use the CLI). It targets the profile with username **William** (case-insensitive) and:
+   - Adds mutual follows with up to 5 other existing users (so run step 2 first if you want non-zero followers/following).
+   - Assigns podium ranks (1st, 2nd, 3rd) and scores to your submissions (one per challenge, up to 3).
+   - Updates your profile stats (Challenges, Podiums, Follower/Following counts). Safe to run multiple times.
+
 ## Server API
 
 | Endpoint | Method | Description |
