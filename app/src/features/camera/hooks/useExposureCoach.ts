@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { ExposureMetrics } from '../../../infra/frameProcessing/exposureAnalysis';
 
 export interface ExposureCoachState {
@@ -16,30 +16,24 @@ export const useExposureCoach = () => {
     hintText: null,
   });
 
+  const prevHintRef = useRef<string | null>(null);
+
   const onMetrics = useCallback((metrics: ExposureMetrics) => {
     let hint: string | null = null;
-    
-    // Debug logging
-    if (__DEV__) {
-      // Throttle logs slightly to avoid spamming every frame (approx 10% chance)
-      if (Math.random() < 0.1) {
-        console.log(`[ExposureCoach] Highlights: ${(metrics.highlightClipPct * 100).toFixed(1)}%, Shadows: ${(metrics.shadowClipPct * 100).toFixed(1)}%, Mean: ${metrics.meanLuminance.toFixed(1)}`);
-      }
-    }
 
     if (metrics.highlightClipPct > HIGHLIGHT_THRESHOLD) {
       hint = 'Too bright — tap to expose';
     } else if (metrics.shadowClipPct > SHADOW_THRESHOLD) {
-      // Only warn about shadows if the overall scene isn't intentionally very dark
       if (metrics.meanLuminance > LOW_LIGHT_MEAN_THRESHOLD) {
         hint = 'Too dark — add light';
       }
     }
 
-    setState({
-      metrics,
-      hintText: hint,
-    });
+    // Only re-render when the hint actually changes
+    if (hint !== prevHintRef.current) {
+      prevHintRef.current = hint;
+      setState({ metrics, hintText: hint });
+    }
   }, []);
 
   return {

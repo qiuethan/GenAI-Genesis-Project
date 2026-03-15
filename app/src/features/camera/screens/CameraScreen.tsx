@@ -26,11 +26,12 @@ import { useDeviceOrientation } from '../../../infra/sensors/useDeviceOrientatio
 
 import { CaptureButton } from '../components/CaptureButton';
 import { CompositionPatternOverlay } from '../components/CompositionPatternOverlay';
+import { CompositionScoreOverlay } from '../components/CompositionScoreOverlay';
 import { IconButton } from '../components/IconButton';
 import { RotatableView } from '../components/RotatableView';
 import { ShutterFlash, ShutterFlashHandle } from '../components/ShutterFlash';
 import { CameraControlsMenu } from '../components/CameraControlsMenu';
-import { useTimer, useNightMode, useExposure, useFocus, useShakeCoach, useLevelCoach, useExposureCoach, useCompositionScore, useScanMode, scorePhoto } from '../hooks';
+import { useTimer, useNightMode, useExposure, useFocus, useShakeCoach, useLevelCoach, useExposureCoach, useCompositionScore, scorePhoto, useScanMode, getAutoScoreEnabled, loadAutoScore } from '../hooks';
 import { ShakeCoachOverlay } from '../components/ShakeCoachOverlay';
 import { LevelCoachOverlay } from '../components/LevelCoachOverlay';
 import { ExposureCoachOverlay } from '../components/ExposureCoachOverlay';
@@ -61,6 +62,9 @@ export const CameraScreen = () => {
   const shakeCoach = useShakeCoach();
   const levelCoach = useLevelCoach();
   const exposureCoach = useExposureCoach();
+
+  // Warm auto-score cache
+  useEffect(() => { loadAutoScore(); }, []);
 
   // Hooks
   const navigation = useNavigation();
@@ -94,15 +98,32 @@ export const CameraScreen = () => {
   const orientation = useDeviceOrientation();
 
   // Scan mode
-  const scan = useScanMode(cameraRef);
+  const scan = useScanMode(cameraRef, aspectRatio);
   const frameProcessor = analysisFrameProcessor;
 
   // Composition assessment via Mac server over USB
   const composition = useCompositionScore({
     cameraRef,
     aspectRatio,
-    enabled: isFocused,
+    enabled: isFocused && !scan.isScanMode && !scan.isProcessing && !scan.hasResult,
   });
+
+  // Composition type from /analyze result (bundled with scoring)
+  const DISPLAY_NAMES: Record<string, string> = {
+    rule_of_thirds: 'Rule of Thirds',
+    symmetric: 'Symmetric',
+    diagonal: 'Diagonal',
+    golden_ratio: 'Golden Ratio',
+    triangle: 'Triangle',
+    center: 'Center',
+    curved: 'Curved',
+    horizontal: 'Horizontal',
+    radial: 'Radial',
+    vanishing_point: 'Vanishing Point',
+    vertical: 'Vertical',
+  };
+  const compositionType = composition.result?.composition_type ?? null;
+  const compositionDisplayName = compositionType ? (DISPLAY_NAMES[compositionType] ?? compositionType) : null;
 
   // Mapping device orientation to UI rotation
   const uiRotation = orientation === 0 ? 0 : orientation === 180 ? 180 : orientation === 90 ? 90 : 270;
@@ -225,6 +246,10 @@ export const CameraScreen = () => {
       const displayUri = await getLatestPhoto();
       if (displayUri) setLastPhoto(displayUri);
 
+      // Score the newly captured photo in the background (if auto-score enabled)
+      if (getAutoScoreEnabled()) {
+        scorePhoto(asset.id, asset.uri).catch(() => {});
+      }
     } catch (e) {
       console.error("Processing failed", e);
     }
@@ -340,8 +365,8 @@ export const CameraScreen = () => {
             {/* Clear Middle with Grid */}
             <Animated.View style={{ height: animatedHeight, width: screenWidth, alignSelf: 'center' }}>
               <CompositionPatternOverlay
-                dominantPattern={composition.result?.dominant_pattern}
-                visible={composition.result?.dominant_pattern !== undefined}
+                compositionType={compositionType ?? undefined}
+                visible={!scan.isScanMode && compositionType != null}
               />
             </Animated.View>
 
@@ -406,6 +431,14 @@ export const CameraScreen = () => {
             </View>
           )}
 
+          {/* Composition Score Overlay */}
+          <CompositionScoreOverlay
+            result={composition.result}
+            connected={composition.connected}
+            rotation={uiRotation}
+            cameraFrameTop={topMargin}
+            compositionTypeName={compositionDisplayName}
+          />
         </Pressable>
       </PinchGestureHandler>
 

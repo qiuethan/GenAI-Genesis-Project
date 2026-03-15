@@ -12,10 +12,8 @@ export interface CompositionResult {
   inference_ms: number;
   composition_score?: number;
   distribution?: number[];
-  pattern_weights?: number[];
-  dominant_pattern?: number;
-  dominant_pattern_name?: string;
   attributes?: Record<string, number>;
+  composition_type?: string | null;
 }
 
 export interface UseCompositionScoreConfig {

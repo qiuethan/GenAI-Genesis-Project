@@ -9,8 +9,8 @@ import { IconButton } from '../components/IconButton';
 import { imageViewerStyles as styles, IMAGE_VIEWER_CONSTANTS } from '../styles';
 import { CameraStackParamList } from '../types';
 import { removePhotosFromAlbum } from '../hooks/useAlbums';
-import { useGalleryScores } from '../hooks/useGalleryScores';
 import { getServerUrl } from '../../../infra/network/serverUrl';
+import { useGalleryScores, scorePhoto, scoreToColor } from '../hooks';
 
 const { SCREEN_WIDTH } = IMAGE_VIEWER_CONSTANTS;
 
@@ -27,15 +27,19 @@ export const ImageViewerScreen = () => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const flatListRef = useRef<FlatList>(null);
 
+  // Score state
   const { scores } = useGalleryScores();
-  const currentPhotoId = photoIds[currentIndex];
-  const cachedScore = currentPhotoId ? scores[currentPhotoId] : null;
+  const [scoringIndex, setScoringIndex] = useState<number | null>(null);
 
   // Composition analysis state
   const [analyzing, setAnalyzing] = useState(false);
   const [annotatedImage, setAnnotatedImage] = useState<string | null>(null);
   const [compositionInfo, setCompositionInfo] = useState<{ type: string; score: number } | null>(null);
   const [showAnnotated, setShowAnnotated] = useState(false);
+
+  const currentPhotoId = allPhotoIds?.[currentIndex];
+  const currentScore = currentPhotoId ? scores[currentPhotoId] : undefined;
+  const isScoring = scoringIndex === currentIndex;
 
   const handleClose = () => {
     navigation.goBack();
@@ -88,6 +92,15 @@ export const ImageViewerScreen = () => {
   const viewabilityConfig = useRef({
     itemVisiblePercentThreshold: 50,
   }).current;
+
+  const handleScore = useCallback(async () => {
+    if (!currentPhotoId || isScoring) return;
+    setScoringIndex(currentIndex);
+    try {
+      await scorePhoto(currentPhotoId, photos[currentIndex]);
+    } catch {}
+    setScoringIndex(null);
+  }, [currentPhotoId, currentIndex, photos, isScoring]);
 
   const handleAnalyze = useCallback(async () => {
     const photoUri = photos[currentIndex];
@@ -150,14 +163,6 @@ export const ImageViewerScreen = () => {
     </View>
   );
 
-  const scoreToColor = (score: number): string => {
-    const t = Math.max(0, Math.min(1, score / 100));
-    if (t < 0.25) return '#ff4444';
-    if (t < 0.5) return '#ff9900';
-    if (t < 0.75) return '#aacc00';
-    return '#44cc44';
-  };
-
   return (
     <View style={styles.container}>
       {/* Original photos */}
@@ -189,7 +194,7 @@ export const ImageViewerScreen = () => {
           <Image
             source={{ uri: annotatedImage }}
             style={{ flex: 1 }}
-            resizeMode="contain"
+            contentFit="contain"
           />
         </TouchableOpacity>
       )}
@@ -199,8 +204,42 @@ export const ImageViewerScreen = () => {
         <View style={[analyzeStyles.infoPill, { top: insets.top + 60 }]}>
           <Text style={analyzeStyles.infoType}>{compositionInfo.type}</Text>
           <Text style={[analyzeStyles.infoScore, { color: scoreToColor(compositionInfo.score) }]}>
-            📐 {Math.round(compositionInfo.score)}
+            {Math.round(compositionInfo.score)}
           </Text>
+        </View>
+      )}
+
+      {/* Score pills (when scored) — shows both aesthetic + composition */}
+      {currentScore && !showAnnotated && (
+        <View style={[scoreStyles.pillContainer, { bottom: insets.bottom + 130 }]}>
+          <View style={[scoreStyles.scorePill, { backgroundColor: scoreToColor(currentScore.aesthetic_score) }]}>
+            <Text style={scoreStyles.scorePillText}>{Math.round(currentScore.aesthetic_score)}</Text>
+          </View>
+          {currentScore.composition_score != null && (
+            <View style={[scoreStyles.scorePill, { backgroundColor: scoreToColor(currentScore.composition_score) }]}>
+              <Text style={scoreStyles.scorePillText}>{Math.round(currentScore.composition_score)}</Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Score button (when unscored and has photo ID) */}
+      {!currentScore && currentPhotoId && !showAnnotated && (
+        <View style={[scoreStyles.buttonContainer, { bottom: insets.bottom + 130 }]}>
+          <TouchableOpacity
+            style={scoreStyles.scoreButton}
+            onPress={handleScore}
+            disabled={isScoring}
+          >
+            {isScoring ? (
+              <>
+                <ActivityIndicator color="#000" size="small" />
+                <Text style={scoreStyles.scoreButtonText}>Scoring...</Text>
+              </>
+            ) : (
+              <Text style={scoreStyles.scoreButtonText}>Score</Text>
+            )}
+          </TouchableOpacity>
         </View>
       )}
 
@@ -244,15 +283,6 @@ export const ImageViewerScreen = () => {
         </View>
       )}
 
-      {/* Cached score – bottom right */}
-      {cachedScore && (
-        <View style={[scoreStyles.container, { bottom: insets.bottom + 30 }]}>
-          <Text style={[scoreStyles.value, { color: scoreToColor(cachedScore.aesthetic_score) }]}>
-            {Math.round(cachedScore.aesthetic_score)}
-          </Text>
-        </View>
-      )}
-
       {/* Analyze Composition Button */}
       <View style={[analyzeStyles.buttonContainer, { bottom: insets.bottom + 30 }]}>
         <TouchableOpacity
@@ -274,19 +304,48 @@ export const ImageViewerScreen = () => {
 };
 
 const scoreStyles = StyleSheet.create({
-  container: {
+  buttonContainer: {
     position: 'absolute',
-    right: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 20,
-    width: 40,
-    height: 40,
+    left: 0,
+    right: 0,
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  value: {
-    fontSize: 16,
+  scoreButton: {
+    backgroundColor: '#ffe81f',
+    borderRadius: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  scoreButtonText: {
+    color: '#000',
+    fontSize: 15,
     fontWeight: '700',
+  },
+  pillContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  scorePill: {
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    alignItems: 'center',
+  },
+  scorePillText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '800',
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });
 
