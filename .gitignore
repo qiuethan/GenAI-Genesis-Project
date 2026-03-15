@@ -46,3 +46,7 @@ __pycache__/
 *.pyc
 *.pth
 *.egg-info/
+
+# External reference repos/datasets
+Image-Composition-Assessment-Dataset-CADB/
+TANet-image-aesthetics-and-quality-assessment/
