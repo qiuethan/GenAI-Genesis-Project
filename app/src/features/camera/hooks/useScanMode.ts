@@ -330,7 +330,7 @@ export const useScanMode = (
     if (!result) return;
     try {
       const { width, height } = await new Promise<{ width: number; height: number }>((resolve, reject) => {
-        Image.getSize(result.bestFrameUri, (w, h) => resolve({ width: w, height: h }), reject);
+        RNImage.getSize(result.bestFrameUri, (w: number, h: number) => resolve({ width: w, height: h }), reject);
       });
 
       const isPortrait = height > width;

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { View, Image, FlatList, ViewToken, TouchableOpacity, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, FlatList, ViewToken, TouchableOpacity, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -157,7 +157,7 @@ export const ImageViewerScreen = () => {
           <Image
             source={{ uri: annotatedImage }}
             style={{ flex: 1 }}
-            resizeMode="contain"
+            contentFit="contain"
           />
         </TouchableOpacity>
       )}
